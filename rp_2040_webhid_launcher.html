@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>
+            RP2040 TOTP Launcher
+        </title>
+        <style>
+        :root {
+            color-scheme: dark;
+            --bg: #0b1020;
+            --panel: #121a31;
+            --panel-2: #182341;
+            --text: #e8ecf8;
+            --muted: #9aa7c7;
+            --ok: #5ee08a;
+            --warn: #ffd166;
+            --err: #ff6b6b;
+            --accent: #7aa2ff;
+            --border: #2a3760;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family:
+                Inter,
+                ui-sans-serif,
+                system-ui,
+                -apple-system,
+                BlinkMacSystemFont,
+                "Segoe UI",
+                sans-serif;
+            background: linear-gradient(180deg, #0b1020 0%, #0f1530 100%);
+            color: var(--text);
+        }
+
+        .wrap {
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 32px 20px 64px;
+        }
+
+        h1 {
+            margin: 0 0 8px;
+            font-size: 32px;
+            line-height: 1.1;
+        }
+
+        .subtitle {
+            color: var(--muted);
+            margin-bottom: 24px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
+        }
+
+        .card {
+            background: rgba(18, 26, 49, 0.94);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 18px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+            min-width: 0;
+            overflow: hidden;
+        }
+
+        .card h2 {
+            margin: 0 0 14px;
+            font-size: 18px;
+        }
+
+        .row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 10px;
+            align-items: stretch;
+        }
+
+        .actions button {
+            width: 100%;
+            min-height: 56px;
+        }
+
+        .stack {
+            display: grid;
+            gap: 10px;
+        }
+
+        label {
+            font-size: 13px;
+            color: var(--muted);
+            display: block;
+            margin-bottom: 6px;
+        }
+
+        input {
+            width: 100%;
+            min-height: 56px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px 14px;
+            background: var(--panel-2);
+            color: var(--text);
+            outline: none;
+            font: inherit;
+        }
+
+        button {
+            border: 1px solid var(--border);
+            background: var(--panel-2);
+            color: var(--text);
+            border-radius: 12px;
+            padding: 11px 14px;
+            font: inherit;
+            cursor: pointer;
+            transition:
+                transform 0.05s ease,
+                background 0.15s ease,
+                border-color 0.15s ease;
+        }
+
+        button:hover {
+            background: #223055;
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        button.primary {
+            background: var(--accent);
+            color: #071124;
+            border-color: transparent;
+            font-weight: 700;
+        }
+
+        button.danger {
+            background: #45202a;
+            border-color: #6d2f40;
+        }
+
+        .status {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            align-items: stretch;
+        }
+
+        .pill {
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            background: #10182f;
+            min-width: 0;
+            overflow: hidden;
+        }
+
+        .pill .k {
+            color: var(--muted);
+            font-size: 12px;
+            margin-bottom: 6px;
+        }
+
+        .pill .v {
+            font-size: 15px;
+            font-weight: 600;
+            min-width: 0;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+            line-height: 1.35;
+        }
+
+        .ok {
+            color: var(--ok);
+        }
+
+        .warn {
+            color: var(--warn);
+        }
+
+        .err {
+            color: var(--err);
+        }
+
+        .mono {
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        }
+
+        pre {
+            margin: 0;
+            padding: 14px;
+            border-radius: 14px;
+            background: #08101f;
+            border: 1px solid var(--border);
+            overflow: auto;
+            min-height: 180px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .hint {
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .device-badge {
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            background: #0e1730;
+            color: var(--muted);
+        }
+        </style>
+    </head>
+    <body>
+        <div class="wrap">
+            <div class="topbar">
+                <div>
+                    <h1>
+                        RP2040 TOTP Launcher
+                    </h1>
+                    <div class="subtitle">
+                        WebHID panel for time, password, and TOTP secret.
+                    </div>
+                </div>
+                <div id="deviceBadge" class="device-badge">
+                    Not connected
+                </div>
+            </div>
+            <div class="grid">
+                <section class="card stack">
+                    <h2>
+                        Connection
+                    </h2>
+                    <div class="row actions">
+                        <button id="connectBtn" class="primary">Connect device</button> <button id=
+                        "statusBtn">Refresh status</button>
+                    </div>
+                    <div class="hint">
+                        Open this page in Chrome or Edge over HTTPS or from localhost. After
+                        connection, this page can send only commands supported by your firmware.
+                    </div>
+                </section>
+                <section class="card stack">
+                    <h2>
+                        Status
+                    </h2>
+                    <div class="status">
+                        <div class="pill">
+                            <div class="k">
+                                Secret
+                            </div>
+                            <div id="secretState" class="v">
+                                -
+                            </div>
+                        </div>
+                        <div class="pill">
+                            <div class="k">
+                                Password
+                            </div>
+                            <div id="passwordState" class="v">
+                                -
+                            </div>
+                        </div>
+                        <div class="pill">
+                            <div class="k">
+                                RTC
+                            </div>
+                            <div id="rtcState" class="v">
+                                -
+                            </div>
+                        </div>
+                        <div class="pill">
+                            <div class="k">
+                                OSF
+                            </div>
+                            <div id="osfState" class="v">
+                                -
+                            </div>
+                        </div>
+                        <div class="pill">
+                            <div class="k">
+                                RTC Unix time
+                            </div>
+                            <div id="rtcUnix" class="v mono">
+                                -
+                            </div>
+                        </div>
+                        <div class="pill">
+                            <div class="k">
+                                RTC Local time
+                            </div>
+                            <div id="rtcHuman" class="v mono">
+                                -
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                <section class="card stack">
+                    <h2>
+                        Time
+                    </h2>
+                    <div class="row actions">
+                        <button id="setBrowserTimeBtn" class="primary">Set current browser
+                        time</button>
+                    </div>
+                    <div class="hint">
+                        Time is always taken from the browser. Firmware expects an 8-byte
+                        big-endian Unix time and writes it to DS3231 as UTC.
+                    </div>
+                </section>
+                <section class="card stack">
+                    <h2>
+                        Password
+                    </h2>
+                    <div>
+                        <div>
+                            <label for="passwordInput">Password text</label>
+                        </div><input id="passwordInput" class="mono" placeholder="my_password">
+                    </div>
+                    <div class="row actions">
+                        <button id="setPasswordBtn" class="primary">Write password</button>
+                        <button id="clearPasswordBtn" class="danger">Clear password</button>
+                    </div>
+                    <div class="hint">
+                        Password is written as one line, exactly as typed.
+                    </div>
+                </section>
+                <section class="card stack">
+                    <h2>
+                        TOTP secret
+                    </h2>
+                    <div>
+                        <label for="secretInput">Base32 secret</label> <input id="secretInput"
+                        class="mono" placeholder="JBSWY3DPEHPK3PXP">
+                    </div>
+                    <div class="row actions">
+                        <button id="setSecretBtn" class="primary">Write secret</button> <button id=
+                        "clearSecretBtn" class="danger">Clear secret</button>
+                    </div>
+                    <div class="hint">
+                        The string is trimmed and converted to uppercase automatically.
+                    </div>
+                </section>
+                <section class="card" style="grid-column: 1 / -1;">
+                    <h2>
+                        Log
+                    </h2>
+                    <pre id="log"></pre>
+                </section>
+            </div>
+        </div>
+        <script>
+        const REPORT_ID_VENDOR = 2;
+
+        const CMD_SET_TIME_UNIX = 0x01;
+        const CMD_SET_PASSWORD = 0x02;
+        const CMD_SET_TOTP_SECRET = 0x03;
+        const CMD_GET_STATUS = 0x04;
+        const CMD_CLEAR_PASSWORD = 0x05;
+        const CMD_CLEAR_SECRET = 0x06;
+
+        const RSP_OK = 0x80;
+        const RSP_ERR = 0x81;
+        const RSP_STATUS = 0x82;
+
+        let dev = null;
+
+        const els = {
+            deviceBadge: document.getElementById('deviceBadge'),
+            log: document.getElementById('log'),
+            secretState: document.getElementById('secretState'),
+            passwordState: document.getElementById('passwordState'),
+            rtcState: document.getElementById('rtcState'),
+            osfState: document.getElementById('osfState'),
+            rtcUnix: document.getElementById('rtcUnix'),
+            rtcHuman: document.getElementById('rtcHuman'),
+            passwordInput: document.getElementById('passwordInput'),
+            secretInput: document.getElementById('secretInput'),
+        };
+
+        function log(...args) {
+            const line = `[${new Date().toLocaleTimeString()}] ${args.join(' ')}`;
+            els.log.textContent += line + '\n';
+            els.log.scrollTop = els.log.scrollHeight;
+        }
+
+        function setBadge(text, connected = false) {
+            els.deviceBadge.textContent = text;
+            els.deviceBadge.style.color = connected ? 'var(--ok)' : 'var(--muted)';
+        }
+
+        function u64be(n) {
+            let x = BigInt(n);
+            const out = new Uint8Array(8);
+
+            for (let i = 7; i >= 0; i--) {
+                out[i] = Number(x & 0xffn);
+                x >>= 8n;
+            }
+
+            return out;
+        }
+
+        function parseU64BE(bytes, offset = 0) {
+            let x = 0n;
+
+            for (let i = 0; i < 8; i++) {
+                x = (x << 8n) | BigInt(bytes[offset + i]);
+            }
+
+            return x;
+        }
+
+        function statusText(flag, yes = 'yes', no = 'no') {
+            return flag
+                ? `<span class="ok">${yes}</span>`
+                : `<span class="err">${no}</span>`;
+        }
+
+        function setHtml(el, html) {
+            el.innerHTML = html;
+        }
+
+        async function ensureConnected() {
+            if (!dev || !dev.opened) {
+                throw new Error('Device is not connected');
+            }
+        }
+
+        async function sendCmd(cmd, payload = new Uint8Array()) {
+            await ensureConnected();
+
+            const buf = new Uint8Array(1 + payload.length);
+            buf[0] = cmd;
+            buf.set(payload, 1);
+
+            await dev.sendReport(REPORT_ID_VENDOR, buf);
+
+            log(
+                'TX',
+                `cmd=0x${cmd.toString(16).padStart(2, '0')}`,
+                `len=${payload.length}`
+            );
+        }
+
+        function handleStatus(d) {
+            const secretSet = !!d[1];
+            const passSet = !!d[2];
+            const rtcOk = !!d[3];
+            const osf = !!d[4];
+            const secretLen = d[5];
+            const passLen = d[6];
+            const unix = parseU64BE(d, 7);
+
+            setHtml(
+                els.secretState,
+                secretSet
+                    ? (
+                        `<span class="ok">saved</span> ` +
+                        `<span class="mono">(${secretLen})</span>`
+                    )
+                    : `<span class="err">empty</span>`
+            );
+            setHtml(
+                els.passwordState,
+                passSet
+                    ? (
+                        `<span class="ok">saved</span> ` +
+                        `<span class="mono">(${passLen})</span>`
+                    )
+                    : `<span class="err">empty</span>`
+            );
+            setHtml(
+                els.rtcState,
+                rtcOk
+                    ? `<span class="ok">ok</span>`
+                    : `<span class="err">error</span>`
+            );
+            setHtml(
+                els.osfState,
+                osf
+                    ? `<span class="warn">set</span>`
+                    : `<span class="ok">clear</span>`
+            );
+
+            els.rtcUnix.textContent = unix.toString();
+
+            try {
+                const ms = Number(unix) * 1000;
+                const dt = new Date(ms);
+                els.rtcHuman.textContent = Number.isFinite(ms) ? dt.toISOString() : '-';
+            } catch {
+                els.rtcHuman.textContent = '-';
+            }
+
+            log(
+                `status: secret=${secretSet}(${secretLen}) ` +
+                `pass=${passSet}(${passLen}) ` +
+                `rtc=${rtcOk} osf=${osf} unix=${unix}`
+            );
+        }
+
+        function handlePacket(data) {
+            const d = new Uint8Array(data.buffer.slice(0));
+            const kind = d[0];
+
+            log(
+                'RX',
+                Array.from(d)
+                    .map(x => x.toString(16).padStart(2, '0'))
+                    .join(' ')
+            );
+
+            if (kind === RSP_OK) {
+                log(`OK for cmd=0x${d[1].toString(16).padStart(2, '0')}`);
+                return;
+            }
+
+            if (kind === RSP_ERR) {
+                log(
+                    `ERR for cmd=0x${d[1].toString(16).padStart(2, '0')} ` +
+                    `code=${d[2]}`
+                );
+                return;
+            }
+
+            if (kind === RSP_STATUS) {
+                handleStatus(d);
+                return;
+            }
+
+            log(`Unknown packet type 0x${kind.toString(16)}`);
+        }
+
+        async function connect() {
+            const devices = await navigator.hid.requestDevice({
+                filters: [{ vendorId: 0xCafe }],
+            });
+
+            if (!devices.length) {
+                log('Device not selected');
+                return;
+            }
+
+            dev = devices[0];
+
+            await dev.open();
+
+            dev.addEventListener('inputreport', e => handlePacket(e.data));
+
+            setBadge(`Connected: ${dev.productName || 'RP2040 device'}`, true);
+            log('connected:', dev.productName || '(no name)');
+
+            await sendCmd(CMD_GET_STATUS);
+        }
+
+        document.getElementById('connectBtn').addEventListener('click', async () => {
+            try {
+                await connect();
+            } catch (e) {
+                log('connect failed:', e.message || e);
+            }
+        });
+
+        document.getElementById('statusBtn').addEventListener('click', async () => {
+            try {
+                await sendCmd(CMD_GET_STATUS);
+            } catch (e) {
+                log('status failed:', e.message || e);
+            }
+        });
+
+        document
+            .getElementById('setBrowserTimeBtn')
+            .addEventListener('click', async () => {
+                try {
+                    const unix = Math.floor(Date.now() / 1000);
+                    await sendCmd(CMD_SET_TIME_UNIX, u64be(unix));
+                    log(`browser unix time=${unix}`);
+                } catch (e) {
+                    log('set browser time failed:', e.message || e);
+                }
+            });
+
+        document.getElementById('setPasswordBtn').addEventListener('click', async () => {
+            try {
+                const s = els.passwordInput.value;
+                await sendCmd(CMD_SET_PASSWORD, new TextEncoder().encode(s));
+            } catch (e) {
+                log('set password failed:', e.message || e);
+            }
+        });
+
+        document
+            .getElementById('clearPasswordBtn')
+            .addEventListener('click', async () => {
+                try {
+                    await sendCmd(CMD_CLEAR_PASSWORD);
+                } catch (e) {
+                    log('clear password failed:', e.message || e);
+                }
+            });
+
+        document.getElementById('setSecretBtn').addEventListener('click', async () => {
+            try {
+                const s = els.secretInput.value.trim().toUpperCase();
+                await sendCmd(CMD_SET_TOTP_SECRET, new TextEncoder().encode(s));
+            } catch (e) {
+                log('set secret failed:', e.message || e);
+            }
+        });
+
+        document
+            .getElementById('clearSecretBtn')
+            .addEventListener('click', async () => {
+                try {
+                    await sendCmd(CMD_CLEAR_SECRET);
+                } catch (e) {
+                    log('clear secret failed:', e.message || e);
+                }
+            });
+
+        (async () => {
+            if (!('hid' in navigator)) {
+                log('WebHID is not supported by this browser. Use Chrome or Edge.');
+                return;
+            }
+
+            const paired = await navigator.hid.getDevices();
+
+            if (paired.length) {
+                dev = paired[0];
+
+                if (!dev.opened) {
+                    await dev.open();
+                }
+
+                dev.addEventListener('inputreport', e => handlePacket(e.data));
+
+                setBadge(`Connected: ${dev.productName || 'RP2040 device'}`, true);
+                log('restored paired device:', dev.productName || '(no name)');
+
+                await sendCmd(CMD_GET_STATUS);
+            }
+        })().catch(e => log('init failed:', e.message || e));
+        </script>
+    </body>
+</html>

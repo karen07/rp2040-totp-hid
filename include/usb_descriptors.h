@@ -1,0 +1,11 @@
+#ifndef USB_DESCRIPTORS_H_
+#define USB_DESCRIPTORS_H_
+
+enum {
+    REPORT_ID_KEYBOARD = 1,
+    REPORT_ID_VENDOR = 2,
+};
+
+#define VENDOR_REPORT_SIZE 63
+
+#endif /* USB_DESCRIPTORS_H_ */

@@ -1,0 +1,24 @@
+{
+    "version": 6,
+    "configurePresets": [
+        {
+            "name": "release",
+            "displayName": "Release",
+            "description": "Waveshare RP2040 Zero Release",
+            "generator": "Unix Makefiles",
+            "binaryDir": "${sourceDir}/build/release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "PICO_BOARD": "waveshare_rp2040_zero",
+                "PICO_SDK_PATH": "pico-sdk",
+                "CMAKE_C_FLAGS_RELEASE": "-O2"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "release",
+            "configurePreset": "release"
+        }
+    ]
+}
