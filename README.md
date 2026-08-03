@@ -153,14 +153,14 @@ cp build/release/rp2040_totp_hid.uf2 /media/$USER/RPI-RP2/
 В репозитории есть файл:
 
 ```text
-rp_2040_webhid_launcher.html
+rp2040-webhid-launcher.html
 ```
 
 Обычно можно сначала просто открыть этот файл напрямую в Chrome или Edge.
 
 Порядок настройки:
 
-1. Откройте rp_2040_webhid_launcher.html в Chrome или Edge.
+1. Откройте rp2040-webhid-launcher.html в Chrome или Edge.
 1. Нажмите кнопку подключения к устройству.
 1. Выберите RP2040 TOTP HID в списке устройств.
 1. Установите время RTC из браузера.
@@ -177,7 +177,7 @@ python3 -m http.server 8000
 Затем откройте:
 
 ```text
-http://localhost:8000/rp_2040_webhid_launcher.html
+http://localhost:8000/rp2040-webhid-launcher.html
 ```
 
 WebHID обычно работает в Chrome или Edge. Если подключение не появляется, проверьте, что страница открыта через localhost или HTTPS.
@@ -270,7 +270,7 @@ tab
 |   `-- usb_descriptors.h
 |-- pico-sdk
 |-- pico_sdk_import.cmake
-|-- rp_2040_webhid_launcher.html
+|-- rp2040-webhid-launcher.html
 `-- src
     |-- main.c
     `-- usb_descriptors.c
@@ -282,7 +282,7 @@ tab
 - src/usb_descriptors.c - USB descriptors для HID клавиатуры и vendor-defined HID report.
 - include/tusb_config.h - конфигурация TinyUSB device stack.
 - include/usb_descriptors.h - report IDs и размер vendor report.
-- rp_2040_webhid_launcher.html - WebHID панель настройки.
+- rp2040-webhid-launcher.html - WebHID панель настройки.
 - CMakePresets.json - release preset для Waveshare RP2040-Zero.
 
 ## Другая плата или другой pinout
@@ -338,7 +338,7 @@ python3 -m http.server 8000
 И откройте:
 
 ```text
-http://localhost:8000/rp_2040_webhid_launcher.html
+http://localhost:8000/rp2040-webhid-launcher.html
 ```
 
 ### TOTP код неправильный
