@@ -20,10 +20,14 @@ target_link_libraries(
             pico_unique_id
             hardware_i2c
             hardware_gpio
+            hardware_pio
             hardware_uart
             hardware_sync
             tinyusb_device
             tinyusb_board)
+
+pico_generate_pio_header(rp2040_totp_hid
+                         ${CMAKE_CURRENT_LIST_DIR}/src/ws2812.pio)
 
 target_compile_options(rp2040_totp_hid PRIVATE -Wall -Wextra -Werror)
 

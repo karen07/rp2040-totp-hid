@@ -3,7 +3,7 @@
  *
  * Features:
  *  - BOOTSEL button via QSPI CS trick
- *  - LED ON while button is physically pressed
+ *  - Onboard WS2812 status LED: red blink on RTC/OSF fault, green while pressed
  *  - Single click  -> type current TOTP
  *  - Double click  -> type password
  *  - UART0 debug + time set:
@@ -41,9 +41,11 @@
 #include "hardware/structs/sio.h"
 #include "hardware/i2c.h"
 #include "hardware/gpio.h"
+#include "hardware/pio.h"
 #include "hardware/regs/addressmap.h"
 
 #include "usb_descriptors.h"
+#include "ws2812.pio.h"
 
 //--------------------------------------------------------------------+
 // CONFIG
@@ -57,8 +59,8 @@
 
 #define DBG_UART_ID uart0
 #define DBG_UART_BAUD 115200
-#define DBG_UART_TX 16
-#define DBG_UART_RX 17
+#define DBG_UART_TX 12
+#define DBG_UART_RX 13
 #define DBG_UART_OK 1
 
 #define RTC_I2C i2c1
@@ -66,6 +68,16 @@
 #define RTC_SDA_GPIO 10
 #define RTC_SCL_GPIO 11
 #define DS3231_ADDR 0x68
+
+#define RTC_STATUS_POLL_MS 1000u
+#define RTC_ERROR_BLINK_MS 500u
+#define LED_ERROR_RED 24u
+#define LED_BUTTON_GREEN 12u
+
+#ifndef PICO_DEFAULT_WS2812_PIN
+#define PICO_DEFAULT_WS2812_PIN 16
+#endif
+#define STATUS_LED_GPIO PICO_DEFAULT_WS2812_PIN
 
 #define TIME_CMD_MAX_LINE 128
 
@@ -96,8 +108,19 @@ static uint8_t g_flash_sector_buf[FLASH_SECTOR_SIZE];
 
 static bool s_click_pending = false;
 static uint32_t s_click_deadline_ms = 0;
+static bool s_button_pressed = false;
+
+static bool s_rtc_status_valid = false;
+static bool s_rtc_osf = false;
+
+static PIO s_led_pio = NULL;
+static uint s_led_sm = 0;
+static uint s_led_offset = 0;
+static bool s_led_ready = false;
 
 static void hid_task(void);
+static void rtc_status_poll_task(bool force);
+static void status_led_task(void);
 
 //--------------------------------------------------------------------+
 // Browser protocol
@@ -156,6 +179,46 @@ static void dbg_printf(const char *fmt, ...)
 #else
     (void)fmt;
 #endif
+}
+
+//--------------------------------------------------------------------+
+// Onboard WS2812 status LED
+//--------------------------------------------------------------------+
+
+static bool app_led_try_init(PIO pio)
+{
+    if (!pio_can_add_program(pio, &ws2812_program))
+        return false;
+
+    int sm = pio_claim_unused_sm(pio, false);
+    if (sm < 0)
+        return false;
+
+    s_led_pio = pio;
+    s_led_sm = (uint)sm;
+    s_led_offset = pio_add_program(pio, &ws2812_program);
+    ws2812_program_init(pio, s_led_sm, s_led_offset, STATUS_LED_GPIO, 800000.0f, false);
+    s_led_ready = true;
+    return true;
+}
+
+static bool app_led_init(void)
+{
+    if (!app_led_try_init(pio0) && !app_led_try_init(pio1))
+        return false;
+
+    dbg_printf("[led] WS2812 initialized on GP%u\r\n", (unsigned)STATUS_LED_GPIO);
+    return true;
+}
+
+static void app_led_write_rgb(uint8_t red, uint8_t green, uint8_t blue)
+{
+    if (!s_led_ready)
+        return;
+
+    // WS2812 expects GRB byte order. The PIO state machine consumes the top 24 bits.
+    uint32_t grb = ((uint32_t)green << 16) | ((uint32_t)red << 8) | (uint32_t)blue;
+    pio_sm_put_blocking(s_led_pio, s_led_sm, grb << 8u);
 }
 
 //--------------------------------------------------------------------+
@@ -402,16 +465,42 @@ static bool ds3231_osf_is_set(bool *out_set)
     return true;
 }
 
+static void rtc_status_poll_task(bool force)
+{
+    static uint32_t next_poll_ms = 0;
+    uint32_t now = board_millis();
+
+    if (!force && (int32_t)(now - next_poll_ms) < 0)
+        return;
+
+    next_poll_ms = now + RTC_STATUS_POLL_MS;
+
+    bool osf = false;
+    bool valid = ds3231_osf_is_set(&osf);
+    bool changed = (valid != s_rtc_status_valid) || (valid && osf != s_rtc_osf);
+
+    s_rtc_status_valid = valid;
+    s_rtc_osf = valid && osf;
+
+    if (changed) {
+        if (!valid)
+            dbg_printf("[rtc] status unavailable -> LED fault\r\n");
+        else
+            dbg_printf("[rtc] OSF=%d -> LED %s\r\n", osf ? 1 : 0, osf ? "red blink" : "normal");
+    }
+}
+
 static void ds3231_print_power_status(void)
 {
-    bool osf = false;
-    if (!ds3231_osf_is_set(&osf)) {
+    rtc_status_poll_task(true);
+
+    if (!s_rtc_status_valid) {
         dbg_printf("[rtc] status read failed\r\n");
         return;
     }
 
-    dbg_printf("[rtc] OSF=%d (%s)\r\n", osf ? 1 : 0,
-               osf ? "oscillator stop -> power drop / time may be invalid" : "ok");
+    dbg_printf("[rtc] OSF=%d (%s)\r\n", s_rtc_osf ? 1 : 0,
+               s_rtc_osf ? "oscillator stop -> power drop / time may be invalid" : "ok");
 }
 
 static bool ds3231_clear_osf(void)
@@ -428,7 +517,34 @@ static bool ds3231_clear_osf(void)
         return false;
 
     st &= (uint8_t)~0x80;
-    return ds3231_write_regs(0x0F, &st, 1);
+    bool ok = ds3231_write_regs(0x0F, &st, 1);
+    if (ok) {
+        s_rtc_status_valid = true;
+        s_rtc_osf = false;
+    }
+    return ok;
+}
+
+static void status_led_task(void)
+{
+    static uint32_t last_rgb = UINT32_MAX;
+    uint32_t now = board_millis();
+    uint32_t rgb = 0;
+
+    // An unreadable RTC status is also a fault: TOTP time cannot be trusted.
+    if (!s_rtc_status_valid || s_rtc_osf) {
+        bool blink_on = ((now / RTC_ERROR_BLINK_MS) & 1u) == 0;
+        if (blink_on)
+            rgb = (uint32_t)LED_ERROR_RED << 16;
+    } else if (s_button_pressed) {
+        rgb = (uint32_t)LED_BUTTON_GREEN << 8;
+    }
+
+    if (rgb == last_rgb)
+        return;
+
+    last_rgb = rgb;
+    app_led_write_rgb((uint8_t)(rgb >> 16), (uint8_t)(rgb >> 8), (uint8_t)rgb);
 }
 
 static void ds3231_print_time(void)
@@ -1125,6 +1241,8 @@ static void vendor_send_status(void)
 
     bool osf = false;
     bool rtc_ok = ds3231_osf_is_set(&osf);
+    s_rtc_status_valid = rtc_ok;
+    s_rtc_osf = rtc_ok && osf;
 
     pkt[1] = (g_cfg.totp_secret_b32[0] != '\0') ? 1 : 0;
     pkt[2] = (g_cfg.password[0] != '\0') ? 1 : 0;
@@ -1151,9 +1269,10 @@ static void vendor_send_status(void)
 int main(void)
 {
     board_init();
-    board_led_write(false);
 
     dbg_uart_init();
+    if (!app_led_init())
+        dbg_printf("[led] ERROR: no free PIO state machine/program space\r\n");
     rtc_i2c_init();
     app_cfg_load();
 
@@ -1175,7 +1294,9 @@ int main(void)
     while (1) {
         tud_task();
         uart_time_task();
+        rtc_status_poll_task(false);
         hid_task();
+        status_led_task();
     }
 }
 
@@ -1242,12 +1363,11 @@ static void hid_task(void)
 
     if (stable != raw) {
         stable = raw;
+        s_button_pressed = stable;
 
-        board_led_write(stable);
-
-        dbg_printf("[btn] %s ; led=%d mounted=%d hid_ready=%d suspended=%d\r\n",
-                   stable ? "PRESS" : "RELEASE", stable ? 1 : 0, tud_mounted() ? 1 : 0,
-                   tud_hid_ready() ? 1 : 0, tud_suspended() ? 1 : 0);
+        dbg_printf("[btn] %s ; mounted=%d hid_ready=%d suspended=%d\r\n",
+                   stable ? "PRESS" : "RELEASE", tud_mounted() ? 1 : 0, tud_hid_ready() ? 1 : 0,
+                   tud_suspended() ? 1 : 0);
 
         if (stable) {
             ds3231_print_time();

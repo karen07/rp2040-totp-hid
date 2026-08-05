@@ -23,6 +23,8 @@ RP2040 TOTP HID - это USB HID клавиатура на базе RP2040 дл�
 - Запись и очистка TOTP Base32 секрета
 - Запись и очистка пароля
 - Чтение статуса устройства
+- Красное мигание встроенного RGB LED при OSF или недоступном RTC
+- Зеленый LED во время удержания BOOTSEL при исправном RTC
 - RTC DS3231 по I2C
 - UART0 для отладки и ручной установки времени
 - Хранение настроек во flash памяти
@@ -38,8 +40,9 @@ RP2040 TOTP HID - это USB HID клавиатура на базе RP2040 дл�
 |---|---|
 | DS3231 SDA | GP10 |
 | DS3231 SCL | GP11 |
-| UART0 TX debug | GP16 |
-| UART0 RX debug | GP17 |
+| UART0 TX debug | GP12 |
+| UART0 RX debug | GP13 |
+| Встроенный RGB LED (WS2812B) | GP16 |
 | Кнопка | BOOTSEL |
 | USB | Нативный USB RP2040 |
 
@@ -56,8 +59,8 @@ UART отладка необязательна. Если она нужна, по
 
 | USB-UART адаптер | RP2040 |
 |---|---|
-| RX | GP16 |
-| TX | GP17 |
+| RX | GP12 |
+| TX | GP13 |
 | GND | GND |
 
 Параметры UART:
@@ -65,6 +68,17 @@ UART отладка необязательна. Если она нужна, по
 ```text
 115200 8N1
 ```
+
+## Индикация RGB LED
+
+На Waveshare RP2040-Zero встроенный WS2812B подключен к GP16. Прошивка использует его так:
+
+- RTC исправен, кнопка отпущена: LED выключен.
+- RTC исправен, BOOTSEL удерживается: LED светится зеленым.
+- В DS3231 установлен OSF: LED мигает красным с периодом 1 секунда.
+- Статус DS3231 не читается по I2C: LED также мигает красным.
+
+После успешной установки времени через WebHID или UART прошивка очищает OSF, и аварийное мигание прекращается.
 
 ## Безопасность
 
@@ -273,13 +287,15 @@ tab
 |-- rp2040-webhid-launcher.html
 `-- src
     |-- main.c
-    `-- usb_descriptors.c
+    |-- usb_descriptors.c
+    `-- ws2812.pio
 ```
 
 Основные файлы:
 
 - src/main.c - основная логика прошивки: RTC, TOTP, flash конфигурация, обработка BOOTSEL, UART, HID ввод и WebHID команды.
 - src/usb_descriptors.c - USB descriptors для HID клавиатуры и vendor-defined HID report.
+- src/ws2812.pio - PIO программа управления встроенным RGB LED.
 - include/tusb_config.h - конфигурация TinyUSB device stack.
 - include/usb_descriptors.h - report IDs и размер vendor report.
 - rp2040-webhid-launcher.html - WebHID панель настройки.
@@ -310,8 +326,8 @@ cmake --build build
 #define RTC_SDA_GPIO 10
 #define RTC_SCL_GPIO 11
 
-#define DBG_UART_TX 16
-#define DBG_UART_RX 17
+#define DBG_UART_TX 12
+#define DBG_UART_RX 13
 ```
 
 Измените эти значения, если у вас другая разводка.
