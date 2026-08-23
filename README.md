@@ -97,7 +97,24 @@ UART отладка необязательна. Если она нужна, по
 
 Это экспериментальный проект, а не сертифицированный security token.
 
-## Сборка
+## Готовая прошивка
+
+Для Waveshare RP2040-Zero готовый UF2 можно скачать со страницы [GitHub Releases](https://github.com/karen07/rp2040-totp-hid/releases).
+
+В assets релиза публикуются:
+
+```text
+rp2040_totp_hid.uf2
+rp2040_totp_hid.uf2.sha256
+```
+
+Для обычной установки собирать проект самостоятельно не требуется. Проверить SHA-256 можно, например, так:
+
+```sh
+sha256sum -c rp2040_totp_hid.uf2.sha256
+```
+
+## Сборка из исходников
 
 ### Требования
 
@@ -108,6 +125,12 @@ UART отладка необязательна. Если она нужна, по
 - make
 - ARM embedded GCC toolchain, например arm-none-eabi-gcc
 - зависимости Raspberry Pi Pico SDK
+
+Для Ubuntu/Debian необходимые пакеты можно установить так:
+
+```sh
+sudo apt install build-essential cmake make gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib python3
+```
 
 Клонирование с submodules:
 
@@ -144,6 +167,8 @@ CMAKE_BUILD_TYPE=Release
 ```
 
 ## Прошивка
+
+Скачайте `rp2040_totp_hid.uf2` из [GitHub Releases](https://github.com/karen07/rp2040-totp-hid/releases) или используйте файл, собранный из исходников.
 
 Переведите RP2040 плату в USB bootloader mode:
 
