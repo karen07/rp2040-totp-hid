@@ -2,10 +2,19 @@
 #define USB_DESCRIPTORS_H_
 
 enum {
+    HID_ITF_KEYBOARD = 0,
+    HID_ITF_VENDOR = 1,
+};
+
+enum {
     REPORT_ID_KEYBOARD = 1,
     REPORT_ID_VENDOR = 2,
 };
 
+#define USB_VID_APP 0xCAFEu
+#define USB_PID_APP 0x4008u
+#define VENDOR_USAGE_PAGE 0xFF00u
+#define VENDOR_USAGE 0x0001u
 #define VENDOR_REPORT_SIZE 63
 
 #endif /* USB_DESCRIPTORS_H_ */

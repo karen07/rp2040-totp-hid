@@ -341,14 +341,15 @@
                     <div>
                         <div>
                             <label for="passwordInput">Password text</label>
-                        </div><input id="passwordInput" class="mono" placeholder="my_password">
+                        </div><input id="passwordInput" class="mono" maxlength="62" placeholder=
+                        "my_password">
                     </div>
                     <div class="row actions">
                         <button id="setPasswordBtn" class="primary">Write password</button>
                         <button id="clearPasswordBtn" class="danger">Clear password</button>
                     </div>
                     <div class="hint">
-                        Password is written as one line, exactly as typed.
+                        Password is written as one HID report (maximum 62 UTF-8 bytes).
                     </div>
                 </section>
                 <section class="card stack">
@@ -357,14 +358,15 @@
                     </h2>
                     <div>
                         <label for="secretInput">Base32 secret</label> <input id="secretInput"
-                        class="mono" placeholder="JBSWY3DPEHPK3PXP">
+                        class="mono" maxlength="62" placeholder="JBSWY3DPEHPK3PXP">
                     </div>
                     <div class="row actions">
                         <button id="setSecretBtn" class="primary">Write secret</button> <button id=
                         "clearSecretBtn" class="danger">Clear secret</button>
                     </div>
                     <div class="hint">
-                        The string is trimmed and converted to uppercase automatically.
+                        The string is trimmed, uppercased, and sent as one HID report (maximum 62
+                        ASCII bytes).
                     </div>
                 </section>
                 <section class="card" style="grid-column: 1 / -1;">
@@ -376,6 +378,10 @@
             </div>
         </div>
         <script>
+        const USB_VID = 0xCAFE;
+        const USB_PID = 0x4008;
+        const VENDOR_USAGE_PAGE = 0xFF00;
+        const VENDOR_USAGE = 0x0001;
         const REPORT_ID_VENDOR = 2;
 
         const CMD_SET_TIME_UNIX = 0x01;
@@ -408,6 +414,41 @@
             const line = `[${new Date().toLocaleTimeString()}] ${args.join(' ')}`;
             els.log.textContent += line + '\n';
             els.log.scrollTop = els.log.scrollHeight;
+        }
+
+        function hex4(n) {
+            return `0x${Number(n).toString(16).padStart(4, '0')}`;
+        }
+
+        function deviceInfo(d) {
+            if (!d) return '(null device)';
+            const collections = (d.collections || []).map((c, i) =>
+                `#${i}{usagePage=${hex4(c.usagePage)},usage=${hex4(c.usage)}}`
+            ).join(', ');
+            return `name=${JSON.stringify(d.productName || '')} ` +
+                `VID=${hex4(d.vendorId)} PID=${hex4(d.productId)} ` +
+                `opened=${!!d.opened} collections=[${collections}]`;
+        }
+
+        function logError(prefix, e) {
+            console.error(prefix, e);
+            const name = e?.name || '(none)';
+            const message = JSON.stringify(e?.message || String(e));
+            log(`${prefix}: name=${name} message=${message}`);
+            if (e?.stack) log('stack:', e.stack.replace(/\n/g, ' | '));
+        }
+
+        function isTargetDevice(d) {
+            return d && d.vendorId === USB_VID && d.productId === USB_PID &&
+                (d.collections || []).some(c =>
+                    c.usagePage === VENDOR_USAGE_PAGE && c.usage === VENDOR_USAGE
+                );
+        }
+
+        async function openTarget(d, source) {
+            log(`${source}: trying ${deviceInfo(d)}`);
+            if (!d.opened) await d.open();
+            log(`${source}: open OK ${deviceInfo(d)}`);
         }
 
         function setBadge(text, connected = false) {
@@ -524,6 +565,15 @@
                 `pass=${passSet}(${passLen}) ` +
                 `rtc=${rtcOk} osf=${osf} unix=${unix}`
             );
+
+            if (d.length > 20) {
+                log(
+                    `diag: usb=${!!d[15]} kbd_ready=${!!d[16]} ` +
+                    `vendor_ready=${!!d[17]} webhid_rx=${d[18]} ` +
+                    `last_cmd=0x${d[19].toString(16).padStart(2, '0')} ` +
+                    `rtc_status=0x${d[20].toString(16).padStart(2, '0')}`
+                );
+            }
         }
 
         function handlePacket(data) {
@@ -560,7 +610,12 @@
 
         async function connect() {
             const devices = await navigator.hid.requestDevice({
-                filters: [{ vendorId: 0xCafe }],
+                filters: [{
+                    vendorId: USB_VID,
+                    productId: USB_PID,
+                    usagePage: VENDOR_USAGE_PAGE,
+                    usage: VENDOR_USAGE,
+                }],
             });
 
             if (!devices.length) {
@@ -568,9 +623,9 @@
                 return;
             }
 
-            dev = devices[0];
-
-            await dev.open();
+            devices.forEach((d, i) => log(`selected[${i}]: ${deviceInfo(d)}`));
+            dev = devices.find(isTargetDevice) || devices[0];
+            await openTarget(dev, 'connect');
 
             dev.addEventListener('inputreport', e => handlePacket(e.data));
 
@@ -584,7 +639,7 @@
             try {
                 await connect();
             } catch (e) {
-                log('connect failed:', e.message || e);
+                logError('connect failed', e);
             }
         });
 
@@ -611,7 +666,13 @@
         document.getElementById('setPasswordBtn').addEventListener('click', async () => {
             try {
                 const s = els.passwordInput.value;
-                await sendCmd(CMD_SET_PASSWORD, new TextEncoder().encode(s));
+                const bytes = new TextEncoder().encode(s);
+                if (bytes.length > 62) {
+                    throw new Error(
+                        `Password is ${bytes.length} UTF-8 bytes; max is 62`
+                    );
+                }
+                await sendCmd(CMD_SET_PASSWORD, bytes);
             } catch (e) {
                 log('set password failed:', e.message || e);
             }
@@ -630,7 +691,13 @@
         document.getElementById('setSecretBtn').addEventListener('click', async () => {
             try {
                 const s = els.secretInput.value.trim().toUpperCase();
-                await sendCmd(CMD_SET_TOTP_SECRET, new TextEncoder().encode(s));
+                const bytes = new TextEncoder().encode(s);
+                if (bytes.length > 62) {
+                    throw new Error(
+                        `Secret is ${bytes.length} bytes; max is 62`
+                    );
+                }
+                await sendCmd(CMD_SET_TOTP_SECRET, bytes);
             } catch (e) {
                 log('set secret failed:', e.message || e);
             }
@@ -653,22 +720,21 @@
             }
 
             const paired = await navigator.hid.getDevices();
+            paired.forEach((d, i) => log(`paired[${i}]: ${deviceInfo(d)}`));
 
-            if (paired.length) {
-                dev = paired[0];
-
-                if (!dev.opened) {
-                    await dev.open();
-                }
-
+            dev = paired.find(isTargetDevice) || null;
+            if (dev) {
+                await openTarget(dev, 'init');
                 dev.addEventListener('inputreport', e => handlePacket(e.data));
 
                 setBadge(`Connected: ${dev.productName || 'RP2040 device'}`, true);
                 log('restored paired device:', dev.productName || '(no name)');
 
                 await sendCmd(CMD_GET_STATUS);
+            } else if (paired.length) {
+                log(`No paired target CAFE:4008 vendor FF00:0001; click Connect device.`);
             }
-        })().catch(e => log('init failed:', e.message || e));
+        })().catch(e => logError('init failed', e));
         </script>
     </body>
 </html>
