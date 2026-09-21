@@ -96,14 +96,14 @@ WebHID status-пакет передает в WebGUI:
 Текущая версия WebHID протокола: `1`.
 
 Версия самой WebGUI хранится в `rp2040-webhid-launcher.html` в
-константе `WEBGUI_VERSION`. Текущая версия WebGUI: `1.1.0`.
+константе `WEBGUI_VERSION`. Текущая версия WebGUI: `1.1.1`.
 
-В разделе Status WebGUI показывает все три значения:
+В шапке WebGUI показывает все три значения:
 
 ```text
-WebGUI          1.1.0
-Firmware        1.1.0
-WebHID protocol 1
+WebGUI   1.1.1
+Firmware 1.1.0
+Protocol 1
 ```
 
 Если версия протокола прошивки не совпадает с поддерживаемой WebGUI,
