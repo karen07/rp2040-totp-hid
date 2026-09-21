@@ -9,23 +9,33 @@
         <style>
         :root {
             color-scheme: dark;
-            --bg: #0b1020;
-            --panel: #121a31;
-            --panel-2: #182341;
-            --text: #e8ecf8;
-            --muted: #9aa7c7;
+            --bg: #090e1c;
+            --panel: rgba(18, 26, 49, 0.88);
+            --panel-strong: #131d37;
+            --field: #172340;
+            --text: #edf2ff;
+            --muted: #9aa8c8;
             --ok: #5ee08a;
             --warn: #ffd166;
-            --err: #ff6b6b;
+            --err: #ff7a86;
             --accent: #7aa2ff;
-            --border: #2a3760;
+            --accent-strong: #91b2ff;
+            --border: #2a3a64;
+            --border-soft: rgba(101, 127, 185, 0.24);
+            --shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
         }
 
         * {
             box-sizing: border-box;
         }
 
+        html {
+            min-height: 100%;
+            background: var(--bg);
+        }
+
         body {
+            min-height: 100vh;
             margin: 0;
             font-family:
                 Inter,
@@ -35,154 +45,327 @@
                 BlinkMacSystemFont,
                 "Segoe UI",
                 sans-serif;
-            background: linear-gradient(180deg, #0b1020 0%, #0f1530 100%);
+            background:
+                radial-gradient(
+                    circle at 78% -10%,
+                    rgba(82, 113, 203, 0.18),
+                    transparent 34rem
+                ),
+                radial-gradient(
+                    circle at -12% 28%,
+                    rgba(64, 92, 177, 0.12),
+                    transparent 32rem
+                ),
+                linear-gradient(180deg, #090e1c 0%, #0c1328 100%);
             color: var(--text);
         }
 
+        button,
+        input {
+            font: inherit;
+        }
+
         .wrap {
-            max-width: 980px;
+            width: min(1120px, calc(100% - 40px));
             margin: 0 auto;
-            padding: 32px 20px 64px;
+            padding: 34px 0 60px;
+        }
+
+        .hero {
+            display: flex;
+            justify-content: space-between;
+            gap: 28px;
+            align-items: flex-start;
+            margin-bottom: 22px;
+        }
+
+        .brand {
+            min-width: 0;
         }
 
         h1 {
-            margin: 0 0 8px;
-            font-size: 32px;
-            line-height: 1.1;
+            margin: 0;
+            font-size: clamp(30px, 4vw, 42px);
+            line-height: 1.05;
+            letter-spacing: -0.035em;
         }
 
         .subtitle {
+            max-width: 620px;
+            margin-top: 9px;
             color: var(--muted);
-            margin-bottom: 24px;
+            font-size: 15px;
+            line-height: 1.6;
         }
 
-        .grid {
+        .hero-meta {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            justify-items: end;
+            gap: 10px;
+            flex: 0 0 auto;
+        }
+
+        .device-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 9px;
+            min-height: 40px;
+            padding: 8px 14px;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            background: rgba(13, 22, 45, 0.82);
+            color: var(--muted);
+            font-size: 14px;
+            font-weight: 600;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+        }
+
+        .device-badge::before {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+            box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 13%, transparent);
+            content: "";
+        }
+
+        .versions {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 6px;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .version-item {
+            padding: 5px 8px;
+            border: 1px solid var(--border-soft);
+            border-radius: 8px;
+            background: rgba(13, 22, 45, 0.52);
+            white-space: nowrap;
+        }
+
+        .version-item strong {
+            margin-left: 4px;
+            color: var(--text);
+            font-weight: 650;
+        }
+
+        .layout {
+            display: grid;
             gap: 16px;
         }
 
         .card {
-            background: rgba(18, 26, 49, 0.94);
-            border: 1px solid var(--border);
-            border-radius: 18px;
-            padding: 18px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
             min-width: 0;
+            padding: 20px;
             overflow: hidden;
+            border: 1px solid var(--border-soft);
+            border-radius: 18px;
+            background: var(--panel);
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(16px);
+        }
+
+        .card-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 14px;
+            align-items: center;
+            margin-bottom: 16px;
         }
 
         .card h2 {
-            margin: 0 0 14px;
-            font-size: 18px;
+            margin: 0;
+            font-size: 17px;
+            letter-spacing: -0.012em;
         }
 
-        .row {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            align-items: center;
+        .card-kicker {
+            margin-top: 4px;
+            color: var(--muted);
+            font-size: 12px;
         }
 
-        .actions {
+        .status-card {
+            padding: 18px 20px 20px;
+        }
+
+        .health-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            grid-template-columns: repeat(4, minmax(0, 1fr));
             gap: 10px;
-            align-items: stretch;
         }
 
-        .actions button {
-            width: 100%;
-            min-height: 56px;
+        .health-item {
+            min-width: 0;
+            padding: 13px 14px;
+            border: 1px solid var(--border-soft);
+            border-radius: 13px;
+            background: rgba(11, 19, 39, 0.7);
+        }
+
+        .health-label,
+        .detail-label {
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.055em;
+            text-transform: uppercase;
+        }
+
+        .health-value {
+            margin-top: 7px;
+            overflow: hidden;
+            font-size: 15px;
+            font-weight: 700;
+            line-height: 1.3;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .status-details {
+            display: grid;
+            grid-template-columns: minmax(0, 1.6fr) minmax(170px, 0.8fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .detail-item {
+            min-width: 0;
+            padding: 11px 14px;
+            border: 1px solid var(--border-soft);
+            border-radius: 13px;
+            background: rgba(11, 19, 39, 0.46);
+        }
+
+        .detail-value {
+            margin-top: 5px;
+            overflow: hidden;
+            color: #dce6ff;
+            font-size: 13px;
+            font-weight: 600;
+            line-height: 1.45;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .two-col {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+            align-items: start;
         }
 
         .stack {
             display: grid;
+            gap: 13px;
+        }
+
+        .button-row {
+            display: flex;
             gap: 10px;
-        }
-
-        label {
-            font-size: 13px;
-            color: var(--muted);
-            display: block;
-            margin-bottom: 6px;
-        }
-
-        input {
-            width: 100%;
-            min-height: 56px;
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 12px 14px;
-            background: var(--panel-2);
-            color: var(--text);
-            outline: none;
-            font: inherit;
+            flex-wrap: wrap;
         }
 
         button {
+            min-height: 44px;
+            padding: 10px 15px;
             border: 1px solid var(--border);
-            background: var(--panel-2);
+            border-radius: 11px;
+            background: var(--field);
             color: var(--text);
-            border-radius: 12px;
-            padding: 11px 14px;
-            font: inherit;
             cursor: pointer;
+            font-weight: 600;
             transition:
-                transform 0.05s ease,
-                background 0.15s ease,
-                border-color 0.15s ease;
+                transform 0.06s ease,
+                background 0.14s ease,
+                border-color 0.14s ease,
+                box-shadow 0.14s ease;
         }
 
         button:hover {
-            background: #223055;
+            border-color: #3b5085;
+            background: #1e2c50;
         }
 
         button:active {
             transform: translateY(1px);
         }
 
+        button:focus-visible,
+        input:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
         button.primary {
+            border-color: transparent;
             background: var(--accent);
             color: #071124;
-            border-color: transparent;
-            font-weight: 700;
+            box-shadow: 0 7px 18px rgba(76, 112, 204, 0.2);
+        }
+
+        button.primary:hover {
+            background: var(--accent-strong);
         }
 
         button.danger {
-            background: #45202a;
-            border-color: #6d2f40;
+            border-color: rgba(255, 122, 134, 0.28);
+            background: rgba(91, 34, 47, 0.52);
+            color: #ffd8dd;
         }
 
-        .status {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 10px;
-            align-items: stretch;
+        button.danger:hover {
+            border-color: rgba(255, 122, 134, 0.48);
+            background: rgba(108, 40, 55, 0.66);
         }
 
-        .pill {
-            padding: 12px;
-            border: 1px solid var(--border);
-            border-radius: 14px;
-            background: #10182f;
-            min-width: 0;
-            overflow: hidden;
+        button.compact {
+            min-height: 34px;
+            padding: 6px 11px;
+            font-size: 12px;
         }
 
-        .pill .k {
+        .grow {
+            flex: 1 1 180px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 7px;
             color: var(--muted);
             font-size: 12px;
-            margin-bottom: 6px;
+            font-weight: 600;
         }
 
-        .pill .v {
-            font-size: 15px;
-            font-weight: 600;
-            min-width: 0;
-            overflow-wrap: anywhere;
-            word-break: break-word;
-            line-height: 1.35;
+        input {
+            width: 100%;
+            min-height: 46px;
+            padding: 10px 13px;
+            border: 1px solid var(--border);
+            border-radius: 11px;
+            outline: none;
+            background: var(--field);
+            color: var(--text);
+            transition:
+                border-color 0.14s ease,
+                background 0.14s ease;
+        }
+
+        input:hover {
+            border-color: #3a4d7b;
+        }
+
+        input::placeholder {
+            color: #7584a7;
+        }
+
+        .hint {
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.55;
         }
 
         .ok {
@@ -198,211 +381,270 @@
         }
 
         .mono {
-            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        }
+
+        .log-card {
+            padding-bottom: 18px;
         }
 
         pre {
+            min-height: 150px;
+            max-height: 320px;
             margin: 0;
             padding: 14px;
-            border-radius: 14px;
-            background: #08101f;
-            border: 1px solid var(--border);
             overflow: auto;
-            min-height: 180px;
+            border: 1px solid var(--border-soft);
+            border-radius: 13px;
+            background: rgba(6, 12, 25, 0.9);
+            color: #cbd6f1;
+            font-size: 12px;
+            line-height: 1.55;
             white-space: pre-wrap;
             word-break: break-word;
         }
 
-        .hint {
-            color: var(--muted);
-            font-size: 13px;
-            line-height: 1.5;
+        @media (max-width: 760px) {
+            .wrap {
+                width: min(100% - 24px, 1120px);
+                padding-top: 22px;
+            }
+
+            .hero {
+                display: grid;
+                gap: 16px;
+            }
+
+            .hero-meta {
+                justify-items: start;
+            }
+
+            .versions {
+                justify-content: flex-start;
+            }
+
+            .health-grid,
+            .two-col {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .status-details {
+                grid-template-columns: 1fr;
+            }
         }
 
-        .topbar {
-            display: flex;
-            justify-content: space-between;
-            gap: 12px;
-            align-items: center;
-            flex-wrap: wrap;
-            margin-bottom: 20px;
-        }
+        @media (max-width: 480px) {
+            .health-grid,
+            .two-col {
+                grid-template-columns: 1fr;
+            }
 
-        .device-badge {
-            padding: 10px 12px;
-            border: 1px solid var(--border);
-            border-radius: 999px;
-            background: #0e1730;
-            color: var(--muted);
+            .button-row {
+                display: grid;
+                grid-template-columns: 1fr;
+            }
+
+            .grow {
+                width: 100%;
+            }
         }
         </style>
     </head>
     <body>
-        <div class="wrap">
-            <div class="topbar">
-                <div>
+        <main class="wrap">
+            <header class="hero">
+                <div class="brand">
                     <h1>
                         RP2040 TOTP Launcher
                     </h1>
                     <div class="subtitle">
-                        WebHID panel for time, password, and TOTP secret.
+                        Configure time, password, and TOTP secret through WebHID.
                     </div>
                 </div>
-                <div id="deviceBadge" class="device-badge">
-                    Not connected
+                <div class="hero-meta">
+                    <div id="deviceBadge" class="device-badge">
+                        Not connected
+                    </div>
+                    <div class="versions" aria-label="Version information">
+                        <span class="version-item">WebGUI <strong id=
+                        "webguiVersion">-</strong></span> <span class="version-item">Firmware
+                        <strong id="firmwareVersion">-</strong></span> <span class=
+                        "version-item">Protocol <strong id="protocolVersion">-</strong></span>
+                    </div>
                 </div>
-            </div>
-            <div class="grid">
-                <section class="card stack">
-                    <h2>
-                        Connection
-                    </h2>
-                    <div class="row actions">
-                        <button id="connectBtn" class="primary">Connect device</button> <button id=
-                        "statusBtn">Refresh status</button>
+            </header>
+            <div class="layout">
+                <section class="card status-card">
+                    <div class="card-head">
+                        <div>
+                            <h2>
+                                Device status
+                            </h2>
+                            <div class="card-kicker">
+                                Current configuration and RTC state
+                            </div>
+                        </div><button id="statusBtn" class="compact">Refresh</button>
                     </div>
-                    <div class="hint">
-                        Open this page in Chrome or Edge over HTTPS or from localhost. After
-                        connection, this page can send only commands supported by your firmware.
-                    </div>
-                </section>
-                <section class="card stack">
-                    <h2>
-                        Status
-                    </h2>
-                    <div class="status">
-                        <div class="pill">
-                            <div class="k">
+                    <div class="health-grid">
+                        <div class="health-item">
+                            <div class="health-label">
                                 Secret
                             </div>
-                            <div id="secretState" class="v">
+                            <div id="secretState" class="health-value">
                                 -
                             </div>
                         </div>
-                        <div class="pill">
-                            <div class="k">
+                        <div class="health-item">
+                            <div class="health-label">
                                 Password
                             </div>
-                            <div id="passwordState" class="v">
+                            <div id="passwordState" class="health-value">
                                 -
                             </div>
                         </div>
-                        <div class="pill">
-                            <div class="k">
+                        <div class="health-item">
+                            <div class="health-label">
                                 RTC
                             </div>
-                            <div id="rtcState" class="v">
+                            <div id="rtcState" class="health-value">
                                 -
                             </div>
                         </div>
-                        <div class="pill">
-                            <div class="k">
+                        <div class="health-item">
+                            <div class="health-label">
                                 OSF
                             </div>
-                            <div id="osfState" class="v">
+                            <div id="osfState" class="health-value">
                                 -
                             </div>
                         </div>
-                        <div class="pill">
-                            <div class="k">
-                                WebGUI
+                    </div>
+                    <div class="status-details">
+                        <div class="detail-item">
+                            <div class="detail-label">
+                                RTC time
                             </div>
-                            <div id="webguiVersion" class="v mono">
+                            <div id="rtcHuman" class="detail-value mono">
                                 -
                             </div>
                         </div>
-                        <div class="pill">
-                            <div class="k">
-                                Firmware
+                        <div class="detail-item">
+                            <div class="detail-label">
+                                Unix time
                             </div>
-                            <div id="firmwareVersion" class="v mono">
-                                -
-                            </div>
-                        </div>
-                        <div class="pill">
-                            <div class="k">
-                                WebHID protocol
-                            </div>
-                            <div id="protocolVersion" class="v mono">
-                                -
-                            </div>
-                        </div>
-                        <div class="pill">
-                            <div class="k">
-                                RTC Unix time
-                            </div>
-                            <div id="rtcUnix" class="v mono">
-                                -
-                            </div>
-                        </div>
-                        <div class="pill">
-                            <div class="k">
-                                RTC Local time
-                            </div>
-                            <div id="rtcHuman" class="v mono">
+                            <div id="rtcUnix" class="detail-value mono">
                                 -
                             </div>
                         </div>
                     </div>
                 </section>
-                <section class="card stack">
-                    <h2>
-                        Time
-                    </h2>
-                    <div class="row actions">
-                        <button id="setBrowserTimeBtn" class="primary">Set current browser
-                        time</button>
-                    </div>
-                    <div class="hint">
-                        Time is always taken from the browser. Firmware expects an 8-byte
-                        big-endian Unix time and writes it to DS3231 as UTC.
-                    </div>
-                </section>
-                <section class="card stack">
-                    <h2>
-                        Password
-                    </h2>
-                    <div>
+                <div class="two-col">
+                    <section class="card stack">
+                        <div class="card-head">
+                            <div>
+                                <h2>
+                                    Connection
+                                </h2>
+                                <div class="card-kicker">
+                                    WebHID device access
+                                </div>
+                            </div>
+                        </div>
+                        <div class="button-row">
+                            <button id="connectBtn" class="primary grow">Connect device</button>
+                        </div>
+                        <div class="hint">
+                            Use Chrome or Edge over HTTPS or localhost. The browser asks for
+                            permission before opening the RP2040 WebHID interface.
+                        </div>
+                    </section>
+                    <section class="card stack">
+                        <div class="card-head">
+                            <div>
+                                <h2>
+                                    Time
+                                </h2>
+                                <div class="card-kicker">
+                                    Synchronize the DS3231 RTC
+                                </div>
+                            </div>
+                        </div>
+                        <div class="button-row">
+                            <button id="setBrowserTimeBtn" class="primary grow">Set current browser
+                            time</button>
+                        </div>
+                        <div class="hint">
+                            Browser time is sent as an 8-byte big-endian Unix timestamp and stored
+                            in the DS3231 as UTC.
+                        </div>
+                    </section>
+                </div>
+                <div class="two-col">
+                    <section class="card stack">
+                        <div class="card-head">
+                            <div>
+                                <h2>
+                                    Password
+                                </h2>
+                                <div class="card-kicker">
+                                    Text typed by the keyboard HID
+                                </div>
+                            </div>
+                        </div>
                         <div>
-                            <label for="passwordInput">Password text</label>
-                        </div><input id="passwordInput" class="mono" maxlength="62" placeholder=
-                        "my_password">
+                            <label for="passwordInput">Password text</label> <input id=
+                            "passwordInput" class="mono" maxlength="62" placeholder="my_password">
+                        </div>
+                        <div class="button-row">
+                            <button id="setPasswordBtn" class="primary grow">Write
+                            password</button> <button id="clearPasswordBtn" class=
+                            "danger grow">Clear</button>
+                        </div>
+                        <div class="hint">
+                            Maximum length is 62 UTF-8 bytes.
+                        </div>
+                    </section>
+                    <section class="card stack">
+                        <div class="card-head">
+                            <div>
+                                <h2>
+                                    TOTP secret
+                                </h2>
+                                <div class="card-kicker">
+                                    Base32 key stored in flash
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <label for="secretInput">Base32 secret</label> <input id="secretInput"
+                            class="mono" maxlength="62" placeholder="JBSWY3DPEHPK3PXP">
+                        </div>
+                        <div class="button-row">
+                            <button id="setSecretBtn" class="primary grow">Write secret</button>
+                            <button id="clearSecretBtn" class="danger grow">Clear</button>
+                        </div>
+                        <div class="hint">
+                            Input is trimmed, converted to uppercase, and sent as ASCII.
+                        </div>
+                    </section>
+                </div>
+                <section class="card log-card">
+                    <div class="card-head">
+                        <div>
+                            <h2>
+                                Log
+                            </h2>
+                            <div class="card-kicker">
+                                WebHID traffic and connection diagnostics
+                            </div>
+                        </div>
                     </div>
-                    <div class="row actions">
-                        <button id="setPasswordBtn" class="primary">Write password</button>
-                        <button id="clearPasswordBtn" class="danger">Clear password</button>
-                    </div>
-                    <div class="hint">
-                        Password is written as one HID report (maximum 62 UTF-8 bytes).
-                    </div>
-                </section>
-                <section class="card stack">
-                    <h2>
-                        TOTP secret
-                    </h2>
-                    <div>
-                        <label for="secretInput">Base32 secret</label> <input id="secretInput"
-                        class="mono" maxlength="62" placeholder="JBSWY3DPEHPK3PXP">
-                    </div>
-                    <div class="row actions">
-                        <button id="setSecretBtn" class="primary">Write secret</button> <button id=
-                        "clearSecretBtn" class="danger">Clear secret</button>
-                    </div>
-                    <div class="hint">
-                        The string is trimmed, uppercased, and sent as one HID report (maximum 62
-                        ASCII bytes).
-                    </div>
-                </section>
-                <section class="card" style="grid-column: 1 / -1;">
-                    <h2>
-                        Log
-                    </h2>
                     <pre id="log"></pre>
                 </section>
             </div>
-        </div>
+        </main>
         <script>
-        const WEBGUI_VERSION = '1.1.0';
+        const WEBGUI_VERSION = '1.1.1';
         const SUPPORTED_PROTOCOL_VERSION = 1;
 
         const USB_VID = 0xCAFE;
