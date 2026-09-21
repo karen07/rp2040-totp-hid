@@ -3,7 +3,7 @@
  *
  * Features:
  *  - BOOTSEL button via QSPI CS trick
- *  - Onboard WS2812 status LED: red blink on RTC/OSF fault, green while pressed
+ *  - Onboard WS2812 status LED: red=RTC I/O fault, yellow=OSF warning, green=button, blue=WebHID RX
  *  - Single click  -> type current TOTP
  *  - Double click  -> type password
  *  - UART0 debug + time set:
@@ -70,9 +70,14 @@
 #define DS3231_ADDR 0x68
 
 #define RTC_STATUS_POLL_MS 1000u
-#define RTC_ERROR_BLINK_MS 500u
+#define RTC_ERROR_BLINK_MS 250u
+#define RTC_WARNING_BLINK_MS 500u
+#define WEBHID_ACTIVITY_MS 120u
 #define LED_ERROR_RED 24u
+#define LED_WARNING_RED 16u
+#define LED_WARNING_GREEN 8u
 #define LED_BUTTON_GREEN 12u
+#define LED_WEBHID_BLUE 16u
 
 #ifndef PICO_DEFAULT_WS2812_PIN
 #define PICO_DEFAULT_WS2812_PIN 16
@@ -112,6 +117,12 @@ static bool s_button_pressed = false;
 
 static bool s_rtc_status_valid = false;
 static bool s_rtc_osf = false;
+static int s_rtc_last_status_write_rc = 0;
+static int s_rtc_last_status_read_rc = 0;
+static uint8_t s_rtc_last_status = 0;
+static uint32_t s_webhid_rx_count = 0;
+static uint8_t s_webhid_last_cmd = 0;
+static uint32_t s_webhid_activity_until_ms = 0;
 
 static PIO s_led_pio = NULL;
 static uint s_led_sm = 0;
@@ -121,6 +132,7 @@ static bool s_led_ready = false;
 static void hid_task(void);
 static void rtc_status_poll_task(bool force);
 static void status_led_task(void);
+static void diag_task(void);
 
 //--------------------------------------------------------------------+
 // Browser protocol
@@ -441,13 +453,16 @@ static bool ds3231_read_status(uint8_t *out_status)
     uint8_t st = 0;
 
     int w = i2c_write_blocking(RTC_I2C, DS3231_ADDR, &reg, 1, true);
+    s_rtc_last_status_write_rc = w;
     if (w != 1)
         return false;
 
     int r = i2c_read_blocking(RTC_I2C, DS3231_ADDR, &st, 1, false);
+    s_rtc_last_status_read_rc = r;
     if (r != 1)
         return false;
 
+    s_rtc_last_status = st;
     *out_status = st;
     return true;
 }
@@ -483,10 +498,15 @@ static void rtc_status_poll_task(bool force)
     s_rtc_osf = valid && osf;
 
     if (changed) {
-        if (!valid)
-            dbg_printf("[rtc] status unavailable -> LED fault\r\n");
-        else
-            dbg_printf("[rtc] OSF=%d -> LED %s\r\n", osf ? 1 : 0, osf ? "red blink" : "normal");
+        if (!valid) {
+            dbg_printf("[rtc] FAULT: status unavailable write_rc=%d read_rc=%d -> RED blink\r\n",
+                       s_rtc_last_status_write_rc, s_rtc_last_status_read_rc);
+        } else if (osf) {
+            dbg_printf("[rtc] WARNING: OSF=1 raw_status=0x%02x -> YELLOW blink\r\n",
+                       (unsigned)s_rtc_last_status);
+        } else {
+            dbg_printf("[rtc] OK: status=0x%02x -> normal LED\r\n", (unsigned)s_rtc_last_status);
+        }
     }
 }
 
@@ -531,11 +551,18 @@ static void status_led_task(void)
     uint32_t now = board_millis();
     uint32_t rgb = 0;
 
-    // An unreadable RTC status is also a fault: TOTP time cannot be trusted.
-    if (!s_rtc_status_valid || s_rtc_osf) {
+    // Red is reserved for a real I2C/status read failure.
+    if (!s_rtc_status_valid) {
         bool blink_on = ((now / RTC_ERROR_BLINK_MS) & 1u) == 0;
         if (blink_on)
             rgb = (uint32_t)LED_ERROR_RED << 16;
+    } else if (s_rtc_osf) {
+        // OSF is a warning: the RTC responds, but it recorded an oscillator stop.
+        bool blink_on = ((now / RTC_WARNING_BLINK_MS) & 1u) == 0;
+        if (blink_on)
+            rgb = ((uint32_t)LED_WARNING_RED << 16) | ((uint32_t)LED_WARNING_GREEN << 8);
+    } else if ((int32_t)(s_webhid_activity_until_ms - now) > 0) {
+        rgb = (uint32_t)LED_WEBHID_BLUE;
     } else if (s_button_pressed) {
         rgb = (uint32_t)LED_BUTTON_GREEN << 8;
     }
@@ -545,6 +572,27 @@ static void status_led_task(void)
 
     last_rgb = rgb;
     app_led_write_rgb((uint8_t)(rgb >> 16), (uint8_t)(rgb >> 8), (uint8_t)rgb);
+}
+
+static void diag_task(void)
+{
+    static uint32_t next_ms = 0;
+    uint32_t now = board_millis();
+
+    if ((int32_t)(now - next_ms) < 0)
+        return;
+    next_ms = now + 5000u;
+
+    // Keep quiet in the fully healthy case unless WebHID has never been seen.
+    if (s_rtc_status_valid && !s_rtc_osf && s_webhid_rx_count > 0)
+        return;
+
+    dbg_printf("[diag] usb=%d kbd_ready=%d vendor_ready=%d suspended=%d "
+               "rtc_status_valid=%d osf=%d rtc_status=0x%02x webhid_rx=%lu last_cmd=0x%02x\r\n",
+               tud_mounted() ? 1 : 0, tud_hid_n_ready(HID_ITF_KEYBOARD) ? 1 : 0,
+               tud_hid_n_ready(HID_ITF_VENDOR) ? 1 : 0, tud_suspended() ? 1 : 0,
+               s_rtc_status_valid ? 1 : 0, s_rtc_osf ? 1 : 0, (unsigned)s_rtc_last_status,
+               (unsigned long)s_webhid_rx_count, (unsigned)s_webhid_last_cmd);
 }
 
 static void ds3231_print_time(void)
@@ -1018,12 +1066,12 @@ static void kbd_press(uint8_t mod, uint8_t key)
 {
     uint8_t keycode[6] = { 0 };
     keycode[0] = key;
-    tud_hid_keyboard_report(REPORT_ID_KEYBOARD, mod, keycode);
+    tud_hid_n_keyboard_report(HID_ITF_KEYBOARD, REPORT_ID_KEYBOARD, mod, keycode);
 }
 
 static void kbd_release(void)
 {
-    tud_hid_keyboard_report(REPORT_ID_KEYBOARD, 0, NULL);
+    tud_hid_n_keyboard_report(HID_ITF_KEYBOARD, REPORT_ID_KEYBOARD, 0, NULL);
 }
 
 static void kbd_type_char(char c)
@@ -1206,15 +1254,16 @@ static bool validate_totp_secret_b32(const char *s)
 
 static void vendor_send_packet(const uint8_t *data, uint16_t len)
 {
-    if (!tud_hid_ready()) {
-        dbg_printf("[hid] vendor reply skipped: not ready\r\n");
+    if (!tud_hid_n_ready(HID_ITF_VENDOR)) {
+        dbg_printf("[webhid] reply skipped: vendor HID instance not ready\r\n");
         return;
     }
 
     if (len > VENDOR_REPORT_SIZE)
         len = VENDOR_REPORT_SIZE;
 
-    tud_hid_report(REPORT_ID_VENDOR, data, len);
+    if (!tud_hid_n_report(HID_ITF_VENDOR, REPORT_ID_VENDOR, data, len))
+        dbg_printf("[webhid] tud_hid_n_report failed len=%u\r\n", (unsigned)len);
 }
 
 static void vendor_send_ok(uint8_t cmd)
@@ -1250,6 +1299,14 @@ static void vendor_send_status(void)
     pkt[4] = (rtc_ok && osf) ? 1 : 0;
     pkt[5] = (uint8_t)strnlen(g_cfg.totp_secret_b32, APP_MAX_TOTP_SECRET_LEN);
     pkt[6] = (uint8_t)strnlen(g_cfg.password, APP_MAX_PASSWORD_LEN);
+
+    // Bytes 15+ are protocol-compatible diagnostics for the updated WebGUI.
+    pkt[15] = tud_mounted() ? 1 : 0;
+    pkt[16] = tud_hid_n_ready(HID_ITF_KEYBOARD) ? 1 : 0;
+    pkt[17] = tud_hid_n_ready(HID_ITF_VENDOR) ? 1 : 0;
+    pkt[18] = (uint8_t)(s_webhid_rx_count > 255u ? 255u : s_webhid_rx_count);
+    pkt[19] = s_webhid_last_cmd;
+    pkt[20] = s_rtc_last_status;
 
     int64_t now_unix = 0;
     if (ds3231_get_unix_time_utc(&now_unix)) {
@@ -1297,6 +1354,7 @@ int main(void)
         rtc_status_poll_task(false);
         hid_task();
         status_led_task();
+        diag_task();
     }
 }
 
@@ -1344,7 +1402,7 @@ static void hid_task(void)
             if (tud_suspended()) {
                 dbg_printf("[hid] suspended -> remote wakeup\r\n");
                 tud_remote_wakeup();
-            } else if (tud_mounted() && tud_hid_ready()) {
+            } else if (tud_mounted() && tud_hid_n_ready(HID_ITF_KEYBOARD)) {
                 do_totp_and_type();
                 dbg_printf("[hid] otp done\r\n");
             } else {
@@ -1366,15 +1424,15 @@ static void hid_task(void)
         s_button_pressed = stable;
 
         dbg_printf("[btn] %s ; mounted=%d hid_ready=%d suspended=%d\r\n",
-                   stable ? "PRESS" : "RELEASE", tud_mounted() ? 1 : 0, tud_hid_ready() ? 1 : 0,
-                   tud_suspended() ? 1 : 0);
+                   stable ? "PRESS" : "RELEASE", tud_mounted() ? 1 : 0,
+                   tud_hid_n_ready(HID_ITF_KEYBOARD) ? 1 : 0, tud_suspended() ? 1 : 0);
 
         if (stable) {
             ds3231_print_time();
             return;
         }
 
-        if (!(tud_mounted() && tud_hid_ready()) && !tud_suspended()) {
+        if (!(tud_mounted() && tud_hid_n_ready(HID_ITF_KEYBOARD)) && !tud_suspended()) {
             dbg_printf("[hid] not ready -> ignore click\r\n");
             s_click_pending = false;
             return;
@@ -1431,19 +1489,23 @@ uint16_t tud_hid_get_report_cb(uint8_t instance, uint8_t report_id, hid_report_t
 void tud_hid_set_report_cb(uint8_t instance, uint8_t report_id, hid_report_type_t report_type,
                            uint8_t const *buffer, uint16_t bufsize)
 {
-    (void)instance;
-    (void)report_type;
-
-    if (report_id != REPORT_ID_VENDOR) {
+    if (instance != HID_ITF_VENDOR || report_id != REPORT_ID_VENDOR)
         return;
-    }
 
     if (!buffer || bufsize < 1) {
+        dbg_printf("[webhid] RX malformed instance=%u id=%u type=%u len=%u\r\n", (unsigned)instance,
+                   (unsigned)report_id, (unsigned)report_type, (unsigned)bufsize);
         vendor_send_err(0, ERR_BAD_LENGTH);
         return;
     }
 
     uint8_t cmd = buffer[0];
+    s_webhid_rx_count++;
+    s_webhid_last_cmd = cmd;
+    s_webhid_activity_until_ms = board_millis() + WEBHID_ACTIVITY_MS;
+    dbg_printf("[webhid] RX #%lu instance=%u id=%u type=%u cmd=0x%02x len=%u\r\n",
+               (unsigned long)s_webhid_rx_count, (unsigned)instance, (unsigned)report_id,
+               (unsigned)report_type, (unsigned)cmd, (unsigned)bufsize);
     const uint8_t *payload = buffer + 1;
     uint16_t payload_len = (bufsize > 0) ? (uint16_t)(bufsize - 1) : 0;
 
