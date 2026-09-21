@@ -1307,6 +1307,10 @@ static void vendor_send_status(void)
     pkt[18] = (uint8_t)(s_webhid_rx_count > 255u ? 255u : s_webhid_rx_count);
     pkt[19] = s_webhid_last_cmd;
     pkt[20] = s_rtc_last_status;
+    pkt[21] = WEBHID_PROTOCOL_VERSION;
+    pkt[22] = FW_VERSION_MAJOR;
+    pkt[23] = FW_VERSION_MINOR;
+    pkt[24] = FW_VERSION_PATCH;
 
     int64_t now_unix = 0;
     if (ds3231_get_unix_time_utc(&now_unix)) {
@@ -1333,6 +1337,9 @@ int main(void)
     rtc_i2c_init();
     app_cfg_load();
 
+    dbg_printf("[boot] firmware=%u.%u.%u webhid_protocol=%u\r\n", (unsigned)FW_VERSION_MAJOR,
+               (unsigned)FW_VERSION_MINOR, (unsigned)FW_VERSION_PATCH,
+               (unsigned)WEBHID_PROTOCOL_VERSION);
     dbg_printf("[boot] start; button=BOOTSEL(QSPI CS)\r\n");
     dbg_printf("READY: send 'TIME YYYY-MM-DD HH:MM:SS' or 'EPOCH <seconds>' (UTC)\r\n");
     dbg_printf("[cfg] secret=%s password=%s\r\n", g_cfg.totp_secret_b32[0] ? "set" : "empty",

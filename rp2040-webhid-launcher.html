@@ -305,6 +305,30 @@
                         </div>
                         <div class="pill">
                             <div class="k">
+                                WebGUI
+                            </div>
+                            <div id="webguiVersion" class="v mono">
+                                -
+                            </div>
+                        </div>
+                        <div class="pill">
+                            <div class="k">
+                                Firmware
+                            </div>
+                            <div id="firmwareVersion" class="v mono">
+                                -
+                            </div>
+                        </div>
+                        <div class="pill">
+                            <div class="k">
+                                WebHID protocol
+                            </div>
+                            <div id="protocolVersion" class="v mono">
+                                -
+                            </div>
+                        </div>
+                        <div class="pill">
+                            <div class="k">
                                 RTC Unix time
                             </div>
                             <div id="rtcUnix" class="v mono">
@@ -378,6 +402,9 @@
             </div>
         </div>
         <script>
+        const WEBGUI_VERSION = '1.1.0';
+        const SUPPORTED_PROTOCOL_VERSION = 1;
+
         const USB_VID = 0xCAFE;
         const USB_PID = 0x4008;
         const VENDOR_USAGE_PAGE = 0xFF00;
@@ -404,11 +431,16 @@
             passwordState: document.getElementById('passwordState'),
             rtcState: document.getElementById('rtcState'),
             osfState: document.getElementById('osfState'),
+            webguiVersion: document.getElementById('webguiVersion'),
+            firmwareVersion: document.getElementById('firmwareVersion'),
+            protocolVersion: document.getElementById('protocolVersion'),
             rtcUnix: document.getElementById('rtcUnix'),
             rtcHuman: document.getElementById('rtcHuman'),
             passwordInput: document.getElementById('passwordInput'),
             secretInput: document.getElementById('secretInput'),
         };
+
+        els.webguiVersion.textContent = WEBGUI_VERSION;
 
         function log(...args) {
             const line = `[${new Date().toLocaleTimeString()}] ${args.join(' ')}`;
@@ -518,6 +550,26 @@
             const secretLen = d[5];
             const passLen = d[6];
             const unix = parseU64BE(d, 7);
+            const protocolVersion = d[21];
+            const fwMajor = d[22];
+            const fwMinor = d[23];
+            const fwPatch = d[24];
+
+            els.webguiVersion.textContent = WEBGUI_VERSION;
+            els.firmwareVersion.textContent =
+                `${fwMajor}.${fwMinor}.${fwPatch}`;
+            els.protocolVersion.textContent = protocolVersion.toString();
+
+            if (protocolVersion !== SUPPORTED_PROTOCOL_VERSION) {
+                setHtml(
+                    els.protocolVersion,
+                    `<span class="err">${protocolVersion}</span>`
+                );
+                log(
+                    `WARNING: firmware protocol=${protocolVersion}, ` +
+                    `WebGUI supports=${SUPPORTED_PROTOCOL_VERSION}`
+                );
+            }
 
             setHtml(
                 els.secretState,
@@ -571,7 +623,9 @@
                     `diag: usb=${!!d[15]} kbd_ready=${!!d[16]} ` +
                     `vendor_ready=${!!d[17]} webhid_rx=${d[18]} ` +
                     `last_cmd=0x${d[19].toString(16).padStart(2, '0')} ` +
-                    `rtc_status=0x${d[20].toString(16).padStart(2, '0')}`
+                    `rtc_status=0x${d[20].toString(16).padStart(2, '0')} ` +
+                    `protocol=${protocolVersion} ` +
+                    `firmware=${fwMajor}.${fwMinor}.${fwPatch}`
                 );
             }
         }

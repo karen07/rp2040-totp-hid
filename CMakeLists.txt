@@ -2,7 +2,10 @@ cmake_minimum_required(VERSION 3.13)
 
 include(pico_sdk_import.cmake)
 
-project(rp2040_totp_hid C CXX ASM)
+project(
+    rp2040_totp_hid
+    VERSION 1.1.0
+    LANGUAGES C CXX ASM)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
@@ -13,6 +16,12 @@ add_executable(rp2040_totp_hid src/main.c src/usb_descriptors.c)
 
 target_include_directories(rp2040_totp_hid
                            PRIVATE ${CMAKE_CURRENT_LIST_DIR}/include)
+
+target_compile_definitions(
+    rp2040_totp_hid
+    PRIVATE FW_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
+            FW_VERSION_MINOR=${PROJECT_VERSION_MINOR}
+            FW_VERSION_PATCH=${PROJECT_VERSION_PATCH} WEBHID_PROTOCOL_VERSION=1)
 
 target_link_libraries(
     rp2040_totp_hid
