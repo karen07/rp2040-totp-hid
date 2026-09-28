@@ -1,16 +1,26 @@
 # RP2040 TOTP HID
 
+RP2040 TOTP HID is a small hardware authenticator that behaves as a USB HID keyboard and types either the current TOTP code or one stored password.
+
+The firmware runs on an RP2040 board, keeps time with a DS3231 RTC, stores the Base32 TOTP secret and password in RP2040 flash, and implements Base32, SHA-1, HMAC-SHA1, HOTP, and TOTP locally. A single BOOTSEL press types the current TOTP code; a double press types the stored password.
+
+Configuration is performed from a browser through a WebHID page. The page can synchronize the RTC, write or clear the TOTP secret and password, and read firmware/device status without requiring a dedicated desktop application.
+
+The project is intentionally simple and transparent: stored secrets are not protected by a secure element, so physical access to the device must be considered part of the security model.
+
+## Описание
+
+RP2040 TOTP HID - небольшой аппаратный аутентификатор, который работает как USB HID клавиатура и вводит текущий код TOTP или один сохраненный пароль.
+
+Прошивка работает на плате RP2040, хранит время в RTC DS3231, сохраняет секрет TOTP в формате Base32 и пароль во флеш-памяти RP2040 и локально реализует Base32, SHA-1, HMAC-SHA1, HOTP и TOTP. Одно нажатие BOOTSEL вводит текущий код TOTP, двойное нажатие - сохраненный пароль.
+
+Настройка выполняется из браузера через страницу WebHID. Через нее можно синхронизировать RTC, записывать или очищать секрет TOTP и пароль и читать состояние прошивки и устройства без отдельного настольного приложения.
+
+Проект намеренно сделан простым и прозрачным: сохраненные секреты не защищены отдельным защищенным элементом, поэтому физический доступ к устройству необходимо учитывать как часть модели безопасности.
+
 ![Фото устройства](device.png)
 
-RP2040 TOTP HID - это USB HID клавиатура на базе RP2040 для ввода TOTP кодов и сохраненного пароля.
-
-Устройство работает как обычная USB клавиатура. Одинарное нажатие BOOTSEL вводит текущий TOTP код и нажимает Enter. Двойное нажатие BOOTSEL вводит сохраненный пароль и нажимает Enter.
-
-Время хранится в RTC DS3231. TOTP секрет и пароль сохраняются во flash памяти RP2040. Настройка выполняется через WebHID страницу из браузера.
-
 ![WebHID панель](example.png)
-
-Через WebHID панель можно подключиться к устройству, установить время RTC из браузера, записать TOTP Base32 секрет, записать пароль и проверить состояние устройства.
 
 ## Возможности
 
@@ -386,7 +396,7 @@ cmake --build build
 
 Измените эти значения, если у вас другая разводка.
 
-## Troubleshooting
+## Решение проблем
 
 ### Устройство не появляется в WebHID
 
