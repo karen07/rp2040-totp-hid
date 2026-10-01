@@ -96,7 +96,7 @@ UART отладка необязательна. Если она нужна, по
 
 Версия прошивки задается в `CMakeLists.txt` через
 `project(... VERSION ...)`.
-Текущая версия прошивки: `1.1.0`.
+Текущая версия прошивки: `1.2.0`.
 
 WebHID status-пакет передает в WebGUI:
 
@@ -106,13 +106,13 @@ WebHID status-пакет передает в WebGUI:
 Текущая версия WebHID протокола: `1`.
 
 Версия самой WebGUI хранится в `rp2040-webhid-launcher.html` в
-константе `WEBGUI_VERSION`. Текущая версия WebGUI: `1.1.1`.
+константе `WEBGUI_VERSION`. Текущая версия WebGUI: `1.2.0`.
 
 В шапке WebGUI показывает все три значения:
 
 ```text
-WebGUI   1.1.1
-Firmware 1.1.0
+WebGUI   1.2.0
+Firmware 1.2.0
 Protocol 1
 ```
 
