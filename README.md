@@ -1,16 +1,14 @@
 # RP2040 TOTP HID
 
-RP2040 TOTP HID is a small hardware authenticator that behaves as a USB HID keyboard and types either the current TOTP code or one stored password.
-
-The firmware runs on an RP2040 board, keeps time with a DS3231 RTC, stores the Base32 TOTP secret and password in RP2040 flash, and implements Base32, SHA-1, HMAC-SHA1, HOTP, and TOTP locally. A single BOOTSEL press types the current TOTP code; a double press types the stored password.
-
-Configuration is performed from a browser through a WebHID page. The page can synchronize the RTC, write or clear the TOTP secret and password, and read firmware/device status without requiring a dedicated desktop application.
-
-The project is intentionally simple and transparent: stored secrets are not protected by a secure element, so physical access to the device must be considered part of the security model.
+RP2040 TOTP HID is a small hardware authenticator that types TOTP codes or a stored
+password as a USB HID keyboard. It uses a DS3231 real-time clock and supports
+browser-based configuration through WebHID.
 
 ## Описание
 
-RP2040 TOTP HID - небольшой аппаратный аутентификатор, который работает как USB HID клавиатура и вводит текущий код TOTP или один сохраненный пароль.
+RP2040 TOTP HID - аппаратный аутентификатор, который вводит TOTP-коды или сохранённый пароль
+как USB HID-клавиатура. Использует часы реального времени DS3231 и поддерживает настройку
+через WebHID в браузере.
 
 Прошивка работает на плате RP2040, хранит время в RTC DS3231, сохраняет секрет TOTP в формате Base32 и пароль во флеш-памяти RP2040 и локально реализует Base32, SHA-1, HMAC-SHA1, HOTP и TOTP. Одно нажатие BOOTSEL вводит текущий код TOTP, двойное нажатие - сохраненный пароль.
 
@@ -21,6 +19,29 @@ RP2040 TOTP HID - небольшой аппаратный аутентифика
 ![Фото устройства](device.png)
 
 ![WebHID панель](example.png)
+
+## Содержание
+
+- [С чего начать](#%D1%81-%D1%87%D0%B5%D0%B3%D0%BE-%D0%BD%D0%B0%D1%87%D0%B0%D1%82%D1%8C)
+- [Возможности](#%D0%B2%D0%BE%D0%B7%D0%BC%D0%BE%D0%B6%D0%BD%D0%BE%D1%81%D1%82%D0%B8)
+- [Аппаратная часть](#%D0%B0%D0%BF%D0%BF%D0%B0%D1%80%D0%B0%D1%82%D0%BD%D0%B0%D1%8F-%D1%87%D0%B0%D1%81%D1%82%D1%8C)
+- [Индикация RGB LED](#%D0%B8%D0%BD%D0%B4%D0%B8%D0%BA%D0%B0%D1%86%D0%B8%D1%8F-rgb-led)
+- [Версии](#%D0%B2%D0%B5%D1%80%D1%81%D0%B8%D0%B8)
+- [Безопасность](#%D0%B1%D0%B5%D0%B7%D0%BE%D0%BF%D0%B0%D1%81%D0%BD%D0%BE%D1%81%D1%82%D1%8C)
+- [Сборка из исходников](#%D1%81%D0%B1%D0%BE%D1%80%D0%BA%D0%B0-%D0%B8%D0%B7-%D0%B8%D1%81%D1%85%D0%BE%D0%B4%D0%BD%D0%B8%D0%BA%D0%BE%D0%B2)
+- [Использование](#%D0%B8%D1%81%D0%BF%D0%BE%D0%BB%D1%8C%D0%B7%D0%BE%D0%B2%D0%B0%D0%BD%D0%B8%D0%B5)
+- [Ограничения ввода пароля](#%D0%BE%D0%B3%D1%80%D0%B0%D0%BD%D0%B8%D1%87%D0%B5%D0%BD%D0%B8%D1%8F-%D0%B2%D0%B2%D0%BE%D0%B4%D0%B0-%D0%BF%D0%B0%D1%80%D0%BE%D0%BB%D1%8F)
+- [Структура проекта](#%D1%81%D1%82%D1%80%D1%83%D0%BA%D1%82%D1%83%D1%80%D0%B0-%D0%BF%D1%80%D0%BE%D0%B5%D0%BA%D1%82%D0%B0)
+- [Диагностика USB/WebHID](#%D0%B4%D0%B8%D0%B0%D0%B3%D0%BD%D0%BE%D1%81%D1%82%D0%B8%D0%BA%D0%B0-usbwebhid)
+
+## С чего начать
+
+Сначала проверьте [аппаратную часть](#%D0%B0%D0%BF%D0%BF%D0%B0%D1%80%D0%B0%D1%82%D0%BD%D0%B0%D1%8F-%D1%87%D0%B0%D1%81%D1%82%D1%8C) и
+[ограничения безопасности](#%D0%B1%D0%B5%D0%B7%D0%BE%D0%BF%D0%B0%D1%81%D0%BD%D0%BE%D1%81%D1%82%D1%8C).
+Затем выберите [готовую прошивку](#%D0%B3%D0%BE%D1%82%D0%BE%D0%B2%D0%B0%D1%8F-%D0%BF%D1%80%D0%BE%D1%88%D0%B8%D0%B2%D0%BA%D0%B0) или
+[сборку из исходников](#%D1%81%D0%B1%D0%BE%D1%80%D0%BA%D0%B0-%D0%B8%D0%B7-%D0%B8%D1%81%D1%85%D0%BE%D0%B4%D0%BD%D0%B8%D0%BA%D0%BE%D0%B2), выполните
+[прошивку](#%D0%BF%D1%80%D0%BE%D1%88%D0%B8%D0%B2%D0%BA%D0%B0) и [настройку через WebHID](#%D0%BD%D0%B0%D1%81%D1%82%D1%80%D0%BE%D0%B9%D0%BA%D0%B0-%D1%87%D0%B5%D1%80%D0%B5%D0%B7-webhid).
+Если устройство не определяется, см. [Решение проблем](#%D1%80%D0%B5%D1%88%D0%B5%D0%BD%D0%B8%D0%B5-%D0%BF%D1%80%D0%BE%D0%B1%D0%BB%D0%B5%D0%BC).
 
 ## Возможности
 
