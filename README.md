@@ -4,11 +4,11 @@ RP2040 TOTP HID is a small hardware authenticator that types TOTP codes or a sto
 password as a USB HID keyboard. It uses a DS3231 real-time clock and supports
 browser-based configuration through WebHID.
 
-## Описание
-
 RP2040 TOTP HID - аппаратный аутентификатор, который вводит TOTP-коды или сохранённый пароль
 как USB HID-клавиатура. Использует часы реального времени DS3231 и поддерживает настройку
 через WebHID в браузере.
+
+## Описание
 
 Прошивка работает на плате RP2040, хранит время в RTC DS3231, сохраняет секрет TOTP в формате Base32 и пароль во флеш-памяти RP2040 и локально реализует Base32, SHA-1, HMAC-SHA1, HOTP и TOTP. Одно нажатие BOOTSEL вводит текущий код TOTP, двойное нажатие - сохраненный пароль.
 
@@ -22,19 +22,35 @@ RP2040 TOTP HID - аппаратный аутентификатор, котор�
 
 ## Содержание
 
-- [С чего начать](#%D1%81-%D1%87%D0%B5%D0%B3%D0%BE-%D0%BD%D0%B0%D1%87%D0%B0%D1%82%D1%8C)
+- [Навигация](#%D0%BD%D0%B0%D0%B2%D0%B8%D0%B3%D0%B0%D1%86%D0%B8%D1%8F)
+- [Разработка и проверка изменений](#%D1%80%D0%B0%D0%B7%D1%80%D0%B0%D0%B1%D0%BE%D1%82%D0%BA%D0%B0-%D0%B8-%D0%BF%D1%80%D0%BE%D0%B2%D0%B5%D1%80%D0%BA%D0%B0-%D0%B8%D0%B7%D0%BC%D0%B5%D0%BD%D0%B5%D0%BD%D0%B8%D0%B9)
 - [Возможности](#%D0%B2%D0%BE%D0%B7%D0%BC%D0%BE%D0%B6%D0%BD%D0%BE%D1%81%D1%82%D0%B8)
 - [Аппаратная часть](#%D0%B0%D0%BF%D0%BF%D0%B0%D1%80%D0%B0%D1%82%D0%BD%D0%B0%D1%8F-%D1%87%D0%B0%D1%81%D1%82%D1%8C)
 - [Индикация RGB LED](#%D0%B8%D0%BD%D0%B4%D0%B8%D0%BA%D0%B0%D1%86%D0%B8%D1%8F-rgb-led)
 - [Версии](#%D0%B2%D0%B5%D1%80%D1%81%D0%B8%D0%B8)
 - [Безопасность](#%D0%B1%D0%B5%D0%B7%D0%BE%D0%BF%D0%B0%D1%81%D0%BD%D0%BE%D1%81%D1%82%D1%8C)
+- [Готовая прошивка](#%D0%B3%D0%BE%D1%82%D0%BE%D0%B2%D0%B0%D1%8F-%D0%BF%D1%80%D0%BE%D1%88%D0%B8%D0%B2%D0%BA%D0%B0)
 - [Сборка из исходников](#%D1%81%D0%B1%D0%BE%D1%80%D0%BA%D0%B0-%D0%B8%D0%B7-%D0%B8%D1%81%D1%85%D0%BE%D0%B4%D0%BD%D0%B8%D0%BA%D0%BE%D0%B2)
+  - [Требования](#%D1%82%D1%80%D0%B5%D0%B1%D0%BE%D0%B2%D0%B0%D0%BD%D0%B8%D1%8F)
+- [Прошивка](#%D0%BF%D1%80%D0%BE%D1%88%D0%B8%D0%B2%D0%BA%D0%B0)
+- [Настройка через WebHID](#%D0%BD%D0%B0%D1%81%D1%82%D1%80%D0%BE%D0%B9%D0%BA%D0%B0-%D1%87%D0%B5%D1%80%D0%B5%D0%B7-webhid)
+- [Настройка через UART](#%D0%BD%D0%B0%D1%81%D1%82%D1%80%D0%BE%D0%B9%D0%BA%D0%B0-%D1%87%D0%B5%D1%80%D0%B5%D0%B7-uart)
 - [Использование](#%D0%B8%D1%81%D0%BF%D0%BE%D0%BB%D1%8C%D0%B7%D0%BE%D0%B2%D0%B0%D0%BD%D0%B8%D0%B5)
+- [Параметры TOTP](#%D0%BF%D0%B0%D1%80%D0%B0%D0%BC%D0%B5%D1%82%D1%80%D1%8B-totp)
 - [Ограничения ввода пароля](#%D0%BE%D0%B3%D1%80%D0%B0%D0%BD%D0%B8%D1%87%D0%B5%D0%BD%D0%B8%D1%8F-%D0%B2%D0%B2%D0%BE%D0%B4%D0%B0-%D0%BF%D0%B0%D1%80%D0%BE%D0%BB%D1%8F)
+- [Другая плата или другой pinout](#%D0%B4%D1%80%D1%83%D0%B3%D0%B0%D1%8F-%D0%BF%D0%BB%D0%B0%D1%82%D0%B0-%D0%B8%D0%BB%D0%B8-%D0%B4%D1%80%D1%83%D0%B3%D0%BE%D0%B9-pinout)
+- [Решение проблем](#%D1%80%D0%B5%D1%88%D0%B5%D0%BD%D0%B8%D0%B5-%D0%BF%D1%80%D0%BE%D0%B1%D0%BB%D0%B5%D0%BC)
+  - [Устройство не появляется в WebHID](#%D1%83%D1%81%D1%82%D1%80%D0%BE%D0%B9%D1%81%D1%82%D0%B2%D0%BE-%D0%BD%D0%B5-%D0%BF%D0%BE%D1%8F%D0%B2%D0%BB%D1%8F%D0%B5%D1%82%D1%81%D1%8F-%D0%B2-webhid)
+  - [TOTP код неправильный](#totp-%D0%BA%D0%BE%D0%B4-%D0%BD%D0%B5%D0%BF%D1%80%D0%B0%D0%B2%D0%B8%D0%BB%D1%8C%D0%BD%D1%8B%D0%B9)
+  - [Пароль вводится неправильными символами](#%D0%BF%D0%B0%D1%80%D0%BE%D0%BB%D1%8C-%D0%B2%D0%B2%D0%BE%D0%B4%D0%B8%D1%82%D1%81%D1%8F-%D0%BD%D0%B5%D0%BF%D1%80%D0%B0%D0%B2%D0%B8%D0%BB%D1%8C%D0%BD%D1%8B%D0%BC%D0%B8-%D1%81%D0%B8%D0%BC%D0%B2%D0%BE%D0%BB%D0%B0%D0%BC%D0%B8)
+  - [Пароль вводится не полностью](#%D0%BF%D0%B0%D1%80%D0%BE%D0%BB%D1%8C-%D0%B2%D0%B2%D0%BE%D0%B4%D0%B8%D1%82%D1%81%D1%8F-%D0%BD%D0%B5-%D0%BF%D0%BE%D0%BB%D0%BD%D0%BE%D1%81%D1%82%D1%8C%D1%8E)
+  - [Сборка падает из-за отсутствующего Pico SDK](#%D1%81%D0%B1%D0%BE%D1%80%D0%BA%D0%B0-%D0%BF%D0%B0%D0%B4%D0%B0%D0%B5%D1%82-%D0%B8%D0%B7-%D0%B7%D0%B0-%D0%BE%D1%82%D1%81%D1%83%D1%82%D1%81%D1%82%D0%B2%D1%83%D1%8E%D1%89%D0%B5%D0%B3%D0%BE-pico-sdk)
+  - [Сборка падает из-за неподходящей платы](#%D1%81%D0%B1%D0%BE%D1%80%D0%BA%D0%B0-%D0%BF%D0%B0%D0%B4%D0%B0%D0%B5%D1%82-%D0%B8%D0%B7-%D0%B7%D0%B0-%D0%BD%D0%B5%D0%BF%D0%BE%D0%B4%D1%85%D0%BE%D0%B4%D1%8F%D1%89%D0%B5%D0%B9-%D0%BF%D0%BB%D0%B0%D1%82%D1%8B)
+  - [Диагностика USB/WebHID](#%D0%B4%D0%B8%D0%B0%D0%B3%D0%BD%D0%BE%D1%81%D1%82%D0%B8%D0%BA%D0%B0-usbwebhid)
 - [Структура проекта](#%D1%81%D1%82%D1%80%D1%83%D0%BA%D1%82%D1%83%D1%80%D0%B0-%D0%BF%D1%80%D0%BE%D0%B5%D0%BA%D1%82%D0%B0)
-- [Диагностика USB/WebHID](#%D0%B4%D0%B8%D0%B0%D0%B3%D0%BD%D0%BE%D1%81%D1%82%D0%B8%D0%BA%D0%B0-usbwebhid)
+- [Лицензия](#%D0%BB%D0%B8%D1%86%D0%B5%D0%BD%D0%B7%D0%B8%D1%8F)
 
-## С чего начать
+## Навигация
 
 Сначала проверьте [аппаратную часть](#%D0%B0%D0%BF%D0%BF%D0%B0%D1%80%D0%B0%D1%82%D0%BD%D0%B0%D1%8F-%D1%87%D0%B0%D1%81%D1%82%D1%8C) и
 [ограничения безопасности](#%D0%B1%D0%B5%D0%B7%D0%BE%D0%BF%D0%B0%D1%81%D0%BD%D0%BE%D1%81%D1%82%D1%8C).
@@ -42,6 +58,31 @@ RP2040 TOTP HID - аппаратный аутентификатор, котор�
 [сборку из исходников](#%D1%81%D0%B1%D0%BE%D1%80%D0%BA%D0%B0-%D0%B8%D0%B7-%D0%B8%D1%81%D1%85%D0%BE%D0%B4%D0%BD%D0%B8%D0%BA%D0%BE%D0%B2), выполните
 [прошивку](#%D0%BF%D1%80%D0%BE%D1%88%D0%B8%D0%B2%D0%BA%D0%B0) и [настройку через WebHID](#%D0%BD%D0%B0%D1%81%D1%82%D1%80%D0%BE%D0%B9%D0%BA%D0%B0-%D1%87%D0%B5%D1%80%D0%B5%D0%B7-webhid).
 Если устройство не определяется, см. [Решение проблем](#%D1%80%D0%B5%D1%88%D0%B5%D0%BD%D0%B8%D0%B5-%D0%BF%D1%80%D0%BE%D0%B1%D0%BB%D0%B5%D0%BC).
+
+## Разработка и проверка изменений
+
+**Основные точки изменения:**
+
+- `src/main.c` - основная прошивка: TOTP, время, HID и интерфейсы настройки;
+- `src/usb_descriptors.c` - USB-дескрипторы устройства;
+- `include/usb_descriptors.h` - описания USB-интерфейсов;
+- `include/tusb_config.h` - конфигурация TinyUSB;
+- `src/ws2812.pio` - управление RGB-светодиодом;
+- `rp2040-webhid-launcher.html` - интерфейс настройки через браузер;
+- `.github/workflows/firmware.yml` - сборка прошивки в CI.
+
+**Проверка изменений:** При изменении USB/WebHID согласуйте дескрипторы, прошивку и веб-интерфейс. Проверяйте сборку из "Сборка из исходников" и фактическую работу на устройстве. Не выводите сохранённые секреты в логи, HID-диагностику или тестовые примеры; учитывайте раздел "Безопасность".
+
+**Типовые изменения:**
+
+- Команды WebHID: согласуйте обработчики в `src/main.c` и браузерный
+  `rp2040-webhid-launcher.html`, сохраняя совместимость формата сообщений.
+- Конфигурация USB: проверяйте `src/usb_descriptors.c`,
+  `include/usb_descriptors.h`, `include/tusb_config.h` и интерфейсы в `src/main.c`.
+
+**Инвариант:** Постоянная конфигурация записывается в последний сектор flash
+и содержит `APP_CONFIG_MAGIC` и `APP_CONFIG_VERSION`. Меняя структуру или
+запись, учитывайте уже сохранённые данные и не раскрывайте TOTP-секреты.
 
 ## Возможности
 
@@ -354,38 +395,6 @@ tab
 
 Для корректного ввода символов используйте US keyboard layout на хосте.
 
-## Структура проекта
-
-```text
-.
-|-- CMakeLists.txt
-|-- CMakePresets.json
-|-- LICENSE
-|-- README.md
-|-- device.png
-|-- example.png
-|-- include
-|   |-- tusb_config.h
-|   `-- usb_descriptors.h
-|-- pico-sdk
-|-- pico_sdk_import.cmake
-|-- rp2040-webhid-launcher.html
-`-- src
-    |-- main.c
-    |-- usb_descriptors.c
-    `-- ws2812.pio
-```
-
-Основные файлы:
-
-- src/main.c - основная логика прошивки: RTC, TOTP, flash конфигурация, обработка BOOTSEL, UART, HID ввод и WebHID команды.
-- src/usb_descriptors.c - USB descriptors для HID клавиатуры и vendor-defined HID report.
-- src/ws2812.pio - PIO программа управления встроенным RGB LED.
-- include/tusb_config.h - конфигурация TinyUSB device stack.
-- include/usb_descriptors.h - report IDs и размер vendor report.
-- rp2040-webhid-launcher.html - WebHID панель настройки.
-- CMakePresets.json - release preset для Waveshare RP2040-Zero.
-
 ## Другая плата или другой pinout
 
 Preset по умолчанию использует:
@@ -500,7 +509,7 @@ waveshare_rp2040_zero
 
 Если у вас другая плата, измените PICO_BOARD или соберите вручную с нужным значением.
 
-## Диагностика USB/WebHID
+### Диагностика USB/WebHID
 
 В этой версии используются два независимых HID-интерфейса:
 
@@ -524,6 +533,38 @@ USB PID изменён на `0x4008`, чтобы ОС и браузер не и�
 Диагностический UART0 по-прежнему использует GP12 (TX) / GP13 (RX),
 115200 8N1.
 
+## Структура проекта
+
+```text
+.
+|-- CMakeLists.txt
+|-- CMakePresets.json
+|-- LICENSE
+|-- README.md
+|-- device.png
+|-- example.png
+|-- include
+|   |-- tusb_config.h
+|   `-- usb_descriptors.h
+|-- pico-sdk
+|-- pico_sdk_import.cmake
+|-- rp2040-webhid-launcher.html
+`-- src
+    |-- main.c
+    |-- usb_descriptors.c
+    `-- ws2812.pio
+```
+
+Основные файлы:
+
+- src/main.c - основная логика прошивки: RTC, TOTP, flash конфигурация, обработка BOOTSEL, UART, HID ввод и WebHID команды.
+- src/usb_descriptors.c - USB descriptors для HID клавиатуры и vendor-defined HID report.
+- src/ws2812.pio - PIO программа управления встроенным RGB LED.
+- include/tusb_config.h - конфигурация TinyUSB device stack.
+- include/usb_descriptors.h - report IDs и размер vendor report.
+- rp2040-webhid-launcher.html - WebHID панель настройки.
+- CMakePresets.json - release preset для Waveshare RP2040-Zero.
+
 ## Лицензия
 
-Проект распространяется под лицензией GNU Affero General Public License v3.0. Подробности смотрите в файле LICENSE.
+Проект распространяется под лицензией GNU Affero General Public License v3.0. Подробности см. в файле [LICENSE](LICENSE).
