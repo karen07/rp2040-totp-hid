@@ -556,7 +556,7 @@
             '!@#$%^&*()-_=+[]{};:,.<>?/~',
         ];
         const PASSWORD_GENERATOR_LENGTH = 16;
-        const WEBGUI_VERSION = '1.4.0',
+        const WEBGUI_VERSION = '1.4.1',
             SUPPORTED_PROTOCOL_VERSION = 1,
             USB_VID = 51966,
             USB_PID = 16392,
@@ -572,6 +572,13 @@
             RSP_OK = 128,
             RSP_ERR = 129,
             RSP_STATUS = 130;
+        const STATUS_REFRESH_COMMANDS = new Set([
+            CMD_SET_TIME_UNIX,
+            CMD_SET_PASSWORD,
+            CMD_SET_TOTP_SECRET,
+            CMD_CLEAR_PASSWORD,
+            CMD_CLEAR_SECRET,
+        ]);
         let dev = null;
         let firmwareFullAscii = false;
         let firmwareVersionKnown = false;
@@ -799,6 +806,11 @@
                 n === RSP_OK)
             ) {
                 log(`OK for cmd=0x${t[1].toString(16).padStart(2, '0')}`);
+                if (STATUS_REFRESH_COMMANDS.has(t[1])) {
+                    sendCmd(CMD_GET_STATUS).catch((e) =>
+                        log('auto refresh failed:', e.message || e),
+                    );
+                }
                 return;
             }
             if (n === RSP_ERR) {
