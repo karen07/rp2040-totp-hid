@@ -4,7 +4,7 @@ include(pico_sdk_import.cmake)
 
 project(
     rp2040_totp_hid
-    VERSION 1.2.0
+    VERSION 1.3.0
     LANGUAGES C CXX ASM)
 
 set(CMAKE_C_STANDARD 11)

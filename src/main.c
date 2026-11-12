@@ -160,6 +160,7 @@ enum {
     ERR_BAD_SECRET = 4,
     ERR_FLASH_WRITE = 5,
     ERR_HID_NOT_READY = 6,
+    ERR_BAD_PASSWORD = 7,
 };
 
 //--------------------------------------------------------------------+
@@ -998,6 +999,22 @@ static inline bool button_pressed_raw(void)
 // ASCII -> HID
 //--------------------------------------------------------------------+
 
+// Passwords are restricted to non-space printable ASCII (0x21..0x7E).
+// The keyboard mapping also handles '\n' for automatic Enter after TOTP/password.
+#define PASSWORD_MAX_WEBHID_LEN 62u
+
+static bool password_ascii_valid(const uint8_t *data, size_t len)
+{
+    if (!data || len > PASSWORD_MAX_WEBHID_LEN)
+        return false;
+
+    for (size_t i = 0; i < len; i++) {
+        if (data[i] < 0x21u || data[i] > 0x7Eu)
+            return false;
+    }
+    return true;
+}
+
 static bool ascii_to_hid(char c, uint8_t *mod, uint8_t *key)
 {
     *mod = 0;
@@ -1022,40 +1039,125 @@ static bool ascii_to_hid(char c, uint8_t *mod, uint8_t *key)
     }
 
     switch (c) {
-    case ' ':
-        *key = HID_KEY_SPACE;
-        return true;
     case '\n':
         *key = HID_KEY_ENTER;
+        return true;
+    case '-':
+        *key = HID_KEY_MINUS;
         return true;
     case '=':
         *key = HID_KEY_EQUAL;
         return true;
-    case '+':
-        *mod = KEYBOARD_MODIFIER_LEFTSHIFT;
-        *key = HID_KEY_EQUAL;
+    case '[':
+        *key = HID_KEY_BRACKET_LEFT;
         return true;
-    case '-':
-        *key = HID_KEY_MINUS;
+    case ']':
+        *key = HID_KEY_BRACKET_RIGHT;
+        return true;
+    case '\\':
+        *key = HID_KEY_BACKSLASH;
+        return true;
+    case ';':
+        *key = HID_KEY_SEMICOLON;
+        return true;
+    case '\'':
+        *key = HID_KEY_APOSTROPHE;
+        return true;
+    case '`':
+        *key = HID_KEY_GRAVE;
+        return true;
+    case ',':
+        *key = HID_KEY_COMMA;
+        return true;
+    case '.':
+        *key = HID_KEY_PERIOD;
+        return true;
+    case '/':
+        *key = HID_KEY_SLASH;
+        return true;
+    case '!':
+        *mod = KEYBOARD_MODIFIER_LEFTSHIFT;
+        *key = HID_KEY_1;
+        return true;
+    case '@':
+        *mod = KEYBOARD_MODIFIER_LEFTSHIFT;
+        *key = HID_KEY_2;
+        return true;
+    case '#':
+        *mod = KEYBOARD_MODIFIER_LEFTSHIFT;
+        *key = HID_KEY_3;
+        return true;
+    case '$':
+        *mod = KEYBOARD_MODIFIER_LEFTSHIFT;
+        *key = HID_KEY_4;
+        return true;
+    case '%':
+        *mod = KEYBOARD_MODIFIER_LEFTSHIFT;
+        *key = HID_KEY_5;
+        return true;
+    case '^':
+        *mod = KEYBOARD_MODIFIER_LEFTSHIFT;
+        *key = HID_KEY_6;
+        return true;
+    case '&':
+        *mod = KEYBOARD_MODIFIER_LEFTSHIFT;
+        *key = HID_KEY_7;
+        return true;
+    case '*':
+        *mod = KEYBOARD_MODIFIER_LEFTSHIFT;
+        *key = HID_KEY_8;
+        return true;
+    case '(':
+        *mod = KEYBOARD_MODIFIER_LEFTSHIFT;
+        *key = HID_KEY_9;
+        return true;
+    case ')':
+        *mod = KEYBOARD_MODIFIER_LEFTSHIFT;
+        *key = HID_KEY_0;
         return true;
     case '_':
         *mod = KEYBOARD_MODIFIER_LEFTSHIFT;
         *key = HID_KEY_MINUS;
         return true;
-    case '.':
-        *key = HID_KEY_PERIOD;
+    case '+':
+        *mod = KEYBOARD_MODIFIER_LEFTSHIFT;
+        *key = HID_KEY_EQUAL;
         return true;
-    case ',':
-        *key = HID_KEY_COMMA;
+    case '{':
+        *mod = KEYBOARD_MODIFIER_LEFTSHIFT;
+        *key = HID_KEY_BRACKET_LEFT;
         return true;
-    case '/':
-        *key = HID_KEY_SLASH;
+    case '}':
+        *mod = KEYBOARD_MODIFIER_LEFTSHIFT;
+        *key = HID_KEY_BRACKET_RIGHT;
         return true;
-    case '\\':
+    case '|':
+        *mod = KEYBOARD_MODIFIER_LEFTSHIFT;
         *key = HID_KEY_BACKSLASH;
         return true;
-    case '\t':
-        *key = HID_KEY_TAB;
+    case ':':
+        *mod = KEYBOARD_MODIFIER_LEFTSHIFT;
+        *key = HID_KEY_SEMICOLON;
+        return true;
+    case '"':
+        *mod = KEYBOARD_MODIFIER_LEFTSHIFT;
+        *key = HID_KEY_APOSTROPHE;
+        return true;
+    case '~':
+        *mod = KEYBOARD_MODIFIER_LEFTSHIFT;
+        *key = HID_KEY_GRAVE;
+        return true;
+    case '<':
+        *mod = KEYBOARD_MODIFIER_LEFTSHIFT;
+        *key = HID_KEY_COMMA;
+        return true;
+    case '>':
+        *mod = KEYBOARD_MODIFIER_LEFTSHIFT;
+        *key = HID_KEY_PERIOD;
+        return true;
+    case '?':
+        *mod = KEYBOARD_MODIFIER_LEFTSHIFT;
+        *key = HID_KEY_SLASH;
         return true;
     default:
         return false;
@@ -1455,8 +1557,11 @@ static void hid_task(void)
                 return;
             }
 
-            if (g_cfg.password[0] == '\0') {
+            size_t password_len = strnlen(g_cfg.password, APP_MAX_PASSWORD_LEN);
+            if (password_len == 0) {
                 dbg_printf("[hid] password not set\r\n");
+            } else if (!password_ascii_valid((const uint8_t *)g_cfg.password, password_len)) {
+                dbg_printf("[hid] stored password contains unsupported characters or length\r\n");
             } else {
                 dbg_printf("[hid] typing password\r\n");
                 kbd_type_string(g_cfg.password);
@@ -1550,8 +1655,12 @@ void tud_hid_set_report_cb(uint8_t instance, uint8_t report_id, hid_report_type_
     }
 
     case CMD_SET_PASSWORD: {
-        if (payload_len >= APP_MAX_PASSWORD_LEN) {
+        if (payload_len > PASSWORD_MAX_WEBHID_LEN || payload_len >= APP_MAX_PASSWORD_LEN) {
             vendor_send_err(cmd, ERR_BAD_LENGTH);
+            return;
+        }
+        if (!password_ascii_valid(payload, payload_len)) {
+            vendor_send_err(cmd, ERR_BAD_PASSWORD);
             return;
         }
 
