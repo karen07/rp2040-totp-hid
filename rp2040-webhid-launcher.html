@@ -246,6 +246,10 @@
             border-color: #3b5085;
             background: #1e2c50;
         }
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
         button:active {
             transform: translateY(1px);
         }
@@ -485,14 +489,23 @@
                             id="passwordInput"
                             class="mono"
                             maxlength="62"
+                            aria-describedby="passwordHint passwordError"
                             placeholder="my_password"
                         />
+                        <div id="passwordError" class="hint err" aria-live="polite" hidden></div>
                     </div>
                     <div class="button-row">
+                        <button id="generatePasswordBtn" class="grow">Generate password</button>
                         <button id="setPasswordBtn" class="primary grow">Write password</button>
                         <button id="clearPasswordBtn" class="danger grow">Clear</button>
                     </div>
-                    <div class="hint">Maximum length is 62 UTF-8 bytes.</div>
+                    <div id="passwordHint" class="hint">
+                        Generate creates a 16-character password with lowercase, uppercase, digits,
+                        and + - _. Similar-looking characters are excluded. It is not saved until
+                        you click Write password. Manually entered passwords may use A-Z, a-z, 0-9,
+                        space, tab, newline, = + - _ . , / \. Maximum length: 62 UTF-8 bytes. Use
+                        the US keyboard layout on the host.
+                    </div>
                 </section>
                 <section class="card stack">
                     <div class="card-head">
@@ -531,7 +544,17 @@
         </div>
     </main>
     <script>
-        const WEBGUI_VERSION = '1.2.0',
+        // Keep in sync with ascii_to_hid() in src/main.c.
+        const PASSWORD_ALLOWED_CHARS =
+            'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 =+-_.,/\\\t\n';
+        const PASSWORD_GENERATOR_GROUPS = [
+            'abcdefghjknprstuvwxyz',
+            'ACDEFHJKMNPQRTUVWXY',
+            '347',
+            '+-_',
+        ];
+        const PASSWORD_GENERATOR_LENGTH = 16;
+        const WEBGUI_VERSION = '1.3.0',
             SUPPORTED_PROTOCOL_VERSION = 1,
             USB_VID = 51966,
             USB_PID = 16392,
@@ -561,9 +584,61 @@
             rtcUnix: document.getElementById('rtcUnix'),
             rtcHuman: document.getElementById('rtcHuman'),
             passwordInput: document.getElementById('passwordInput'),
+            passwordError: document.getElementById('passwordError'),
+            setPasswordBtn: document.getElementById('setPasswordBtn'),
             secretInput: document.getElementById('secretInput'),
         };
         els.webguiVersion.textContent = WEBGUI_VERSION;
+        function validatePassword() {
+            const password = els.passwordInput.value;
+            const unsupported = [
+                ...new Set([...password].filter((c) => !PASSWORD_ALLOWED_CHARS.includes(c))),
+            ];
+            const bytes = new TextEncoder().encode(password).length;
+            let error = '';
+            if (unsupported.length) {
+                error =
+                    'Unsupported characters: ' +
+                    unsupported.map((c) => JSON.stringify(c)).join(', ');
+            } else if (bytes > 62) {
+                error = `Password is ${bytes} UTF-8 bytes; max is 62`;
+            }
+            els.passwordError.textContent = error;
+            els.passwordError.hidden = !error;
+            els.passwordInput.setAttribute('aria-invalid', String(Boolean(error)));
+            els.setPasswordBtn.disabled = Boolean(error);
+            return !error;
+        }
+        // Rejection sampling avoids modulo bias when selecting random characters.
+        function secureRandomIndex(length) {
+            const limit = 0x100000000;
+            const cutoff = limit - (limit % length);
+            const sample = new Uint32Array(1);
+            do {
+                crypto.getRandomValues(sample);
+            } while (sample[0] >= cutoff);
+            return sample[0] % length;
+        }
+        function generatePassword() {
+            const alphabet = PASSWORD_GENERATOR_GROUPS.join('');
+            // Guarantee at least one character from each category.
+            const chars = PASSWORD_GENERATOR_GROUPS.map(
+                (group) => group[secureRandomIndex(group.length)],
+            );
+            while (chars.length < PASSWORD_GENERATOR_LENGTH) {
+                chars.push(alphabet[secureRandomIndex(alphabet.length)]);
+            }
+            // Secure Fisher-Yates shuffle to randomize category positions.
+            for (let i = chars.length - 1; i > 0; i--) {
+                const j = secureRandomIndex(i + 1);
+                [chars[i], chars[j]] = [chars[j], chars[i]];
+            }
+            els.passwordInput.value = chars.join('');
+            validatePassword();
+        }
+        document.getElementById('generatePasswordBtn').addEventListener('click', generatePassword);
+        els.passwordInput.addEventListener('input', validatePassword);
+        validatePassword();
         function log(...e) {
             const t = `[${new Date().toLocaleTimeString()}] ${e.join(' ')}`;
             ((els.log.textContent +=
@@ -772,10 +847,11 @@
             }),
             document.getElementById('setPasswordBtn').addEventListener('click', async () => {
                 try {
-                    const t = els.passwordInput.value,
-                        e = new TextEncoder().encode(t);
-                    if (e.length > 62)
-                        throw new Error(`Password is ${e.length} UTF-8 bytes; max is 62`);
+                    if (!validatePassword()) {
+                        log('set password rejected: unsupported characters or excessive length');
+                        return;
+                    }
+                    const e = new TextEncoder().encode(els.passwordInput.value);
                     await sendCmd(CMD_SET_PASSWORD, e);
                 } catch (e) {
                     log('set password failed:', e.message || e);
