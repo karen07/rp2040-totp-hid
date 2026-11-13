@@ -327,6 +327,35 @@
         .mono {
             font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         }
+        .confirm-dialog {
+            width: min(440px, calc(100% - 32px));
+            padding: 24px;
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            background: var(--panel-strong);
+            color: var(--text);
+            box-shadow: var(--shadow);
+        }
+        .confirm-dialog::backdrop {
+            background: rgba(0, 0, 0, 0.72);
+        }
+        .confirm-dialog h2 {
+            margin: 8px 0 12px;
+            font-size: 21px;
+        }
+        .confirm-dialog p {
+            min-height: 48px;
+            color: var(--muted);
+            line-height: 1.5;
+        }
+        .confirm-dialog .button-row {
+            margin-top: 24px;
+        }
+        .confirm-step {
+            color: var(--warn);
+            font-size: 13px;
+            font-weight: 600;
+        }
         .log-card {
             padding-bottom: 18px;
         }
@@ -544,6 +573,20 @@
             </section>
         </div>
     </main>
+    <dialog
+        id="confirmDialog"
+        class="confirm-dialog"
+        aria-labelledby="confirmTitle"
+        aria-describedby="confirmMessage"
+    >
+        <div id="confirmStep" class="confirm-step" aria-live="polite"></div>
+        <h2 id="confirmTitle"></h2>
+        <p id="confirmMessage" aria-live="polite"></p>
+        <div class="button-row">
+            <button id="confirmCancelBtn" class="grow">Cancel</button>
+            <button id="confirmOkBtn" class="danger grow">Continue</button>
+        </div>
+    </dialog>
     <script>
         // Manual passwords: printable ASCII without spaces or control characters.
         // Generated passwords omit common visually ambiguous characters.
@@ -556,7 +599,7 @@
             '!@#$%^&*()-_=+[]{};:,.<>?/~',
         ];
         const PASSWORD_GENERATOR_LENGTH = 16;
-        const WEBGUI_VERSION = '1.4.1',
+        const WEBGUI_VERSION = '1.4.2',
             SUPPORTED_PROTOCOL_VERSION = 1,
             USB_VID = 51966,
             USB_PID = 16392,
@@ -579,6 +622,40 @@
             CMD_CLEAR_PASSWORD,
             CMD_CLEAR_SECRET,
         ]);
+        const CONFIRM_ACTIONS = {
+            writePassword: {
+                title: 'Write password',
+                messages: [
+                    'Write the entered password to the device?',
+                    'This will replace the password currently stored in flash. Continue?',
+                    'Final confirmation: write the new password now?',
+                ],
+            },
+            clearPassword: {
+                title: 'Clear password',
+                messages: [
+                    'Clear the stored password from the device?',
+                    'The stored password will be erased and cannot be read back. Continue?',
+                    'Final confirmation: erase the stored password now?',
+                ],
+            },
+            writeSecret: {
+                title: 'Write TOTP secret',
+                messages: [
+                    'Write the entered TOTP secret to the device?',
+                    'This will replace the current TOTP secret. Keep a backup before continuing.',
+                    'Final confirmation: write the new TOTP secret now?',
+                ],
+            },
+            clearSecret: {
+                title: 'Clear TOTP secret',
+                messages: [
+                    'Clear the stored TOTP secret from the device?',
+                    'The stored secret will be erased. Make sure you have a backup.',
+                    'Final confirmation: erase the stored TOTP secret now?',
+                ],
+            },
+        };
         let dev = null;
         let firmwareFullAscii = false;
         let firmwareVersionKnown = false;
@@ -596,6 +673,12 @@
             rtcHuman: document.getElementById('rtcHuman'),
             passwordInput: document.getElementById('passwordInput'),
             passwordError: document.getElementById('passwordError'),
+            confirmDialog: document.getElementById('confirmDialog'),
+            confirmStep: document.getElementById('confirmStep'),
+            confirmTitle: document.getElementById('confirmTitle'),
+            confirmMessage: document.getElementById('confirmMessage'),
+            confirmCancelBtn: document.getElementById('confirmCancelBtn'),
+            confirmOkBtn: document.getElementById('confirmOkBtn'),
             setPasswordBtn: document.getElementById('setPasswordBtn'),
             secretInput: document.getElementById('secretInput'),
         };
@@ -662,6 +745,38 @@
 `),
                 (els.log.scrollTop = els.log.scrollHeight));
         }
+        function confirmAction(action) {
+            const { title, messages } = CONFIRM_ACTIONS[action];
+            const dialog = els.confirmDialog;
+            let step = 0;
+            return new Promise((resolve) => {
+                function updateStep() {
+                    els.confirmStep.textContent = `Confirmation ${step + 1} of ${messages.length}`;
+                    els.confirmTitle.textContent = title;
+                    els.confirmMessage.textContent = messages[step];
+                    els.confirmOkBtn.textContent =
+                        step === messages.length - 1 ? 'Confirm action' : 'Yes, continue';
+                }
+                function advance() {
+                    step++;
+                    if (step === messages.length) {
+                        dialog.close('confirmed');
+                    } else {
+                        updateStep();
+                    }
+                }
+                function onClose() {
+                    els.confirmOkBtn.removeEventListener('click', advance);
+                    resolve(dialog.returnValue === 'confirmed');
+                }
+                els.confirmOkBtn.addEventListener('click', advance);
+                dialog.addEventListener('close', onClose, { once: true });
+                dialog.returnValue = '';
+                updateStep();
+                dialog.showModal();
+            });
+        }
+        els.confirmCancelBtn.addEventListener('click', () => els.confirmDialog.close('cancelled'));
         function hex4(e) {
             return `0x${Number(e).toString(16).padStart(4, '0')}`;
         }
@@ -877,6 +992,8 @@
                         log('set password rejected: unsupported characters or excessive length');
                         return;
                     }
+                    await ensureConnected();
+                    if (!(await confirmAction('writePassword'))) return;
                     const e = new TextEncoder().encode(els.passwordInput.value);
                     await sendCmd(CMD_SET_PASSWORD, e);
                 } catch (e) {
@@ -885,6 +1002,8 @@
             }),
             document.getElementById('clearPasswordBtn').addEventListener('click', async () => {
                 try {
+                    await ensureConnected();
+                    if (!(await confirmAction('clearPassword'))) return;
                     await sendCmd(CMD_CLEAR_PASSWORD);
                 } catch (e) {
                     log('clear password failed:', e.message || e);
@@ -895,6 +1014,8 @@
                     const t = els.secretInput.value.trim().toUpperCase(),
                         e = new TextEncoder().encode(t);
                     if (e.length > 62) throw new Error(`Secret is ${e.length} bytes; max is 62`);
+                    await ensureConnected();
+                    if (!(await confirmAction('writeSecret'))) return;
                     await sendCmd(CMD_SET_TOTP_SECRET, e);
                 } catch (e) {
                     log('set secret failed:', e.message || e);
@@ -902,6 +1023,8 @@
             }),
             document.getElementById('clearSecretBtn').addEventListener('click', async () => {
                 try {
+                    await ensureConnected();
+                    if (!(await confirmAction('clearSecret'))) return;
                     await sendCmd(CMD_CLEAR_SECRET);
                 } catch (e) {
                     log('clear secret failed:', e.message || e);
